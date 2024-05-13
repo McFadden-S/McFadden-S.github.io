@@ -1,9 +1,12 @@
-"AJP":
-  url: https://aapt.scitation.org/journal/ajp
+"USENIX Sec":
   color: "#00369f"
 
-"PhysRev":
-  url: https://journals.aps.org/
+"IEEE S&P":
+  color: "#00369f"
 
-"Vision":
-  color: "#009f36"
+
+"AISec":
+  color: "#3f9915"
+
+"arXiv":
+  color: "#ffc908"
