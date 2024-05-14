@@ -2,96 +2,102 @@
   type: map
   contents:
     - name: Full Name
-      value: Albert Einstein
-    - name: Date of Birth
-      value: 14th March 1879
+      value: Shae McFadden
+    - name: Nationality
+      value: Canadian
     - name: Languages
-      value: English, German
+      value: English
 
 - title: Education
   type: time_table
   contents:
-    - title: PhD
-      institution: University of Zurich, Zurich, Switzerland
-      year: 1905
+    - title: PhD Candidate
+      institution: King's College London, Unitied Kingdom
+      year: 2023 - Now
       description:
-        - Description 1.
-        - Description 2.
-        - title: Description 3.
-          contents:
-            - Sub-description 1.
-            - Sub-description 2.
-    - title: Federal teaching diploma
-      institution: Eidgenössische Technische Hochschule, Zurich, Switzerland
-      year: 1900
+        - Currently in Progress
+        - Thesis on "Applications of Deep Reinforcement Learning for Cybersecurity - Exploitation, Evasion and Strategy".
+
+    - title: BSc (Hons) Computer Science (Artificial Intelligence)
+      institution: King's College London, Unitied Kingdom
+      year: 2020 - 2023
       description:
-        - Description 1.
-        - Description 2.
+        - First Class Honours.
+        - Dissertation on "Adversarial Machine Learning Evaluation of The MaMaDroid Feature Space".
 
 - title: Experience
   type: time_table
   contents:
-    - title: Professor of Theoretical Physics
-      institution: Institute for Advanced Study, Princeton University
-      year: 1933 - 1955
-      description:
-        - Description 1.
-        - Description 2.
-        - title: Description 3.
-          contents:
-            - Sub-description 1.
-            - Sub-description 2.
-    - title: Visiting Professor
-      institution: California Institute of Technology, Pasadena, California, US
-      year: 1933
-      description:
-        - Description 1.
-        - Description 2.
 
-    - title: Director
-      institution: Kaiser Wilhelm Institute for Physics, Berlin, Germany.
-      year: 1917-1933
-
-    - title: Professor of Theoretical Physics
-      institution: Karl-Ferdinand University, Prague, Czechoslovakia
-      year: 1911 - 1917
+    - title: Visiting Collaborator
+      institution: Artificial Intelligence for Cyber Defence (AICD) Research Centre, The Alan Turing Institute
+      year: 2023 - Now
       description:
 
-    - title: Associate Professor of Theoretical Physics
-      institution: University of Zurich, Zurich, Switzerland
-      year: 1909 - 1911
+    - title: Visiting Researcher
+      institution: Systems Security Lab (S2Lab), University College London
+      year: 2024 - Now
+      description:
+
+    - title: King's Undergraduate Research Fellow
+      institution: King's College London
+      year: 2024 - Now
+      description: Evaluation of the impact of poisoning on machine learning classifiers for malware detection.
 
 - title: Open Source Projects
   type: time_table
   contents:
-    - title: <a href="https://github.com/alshedivat/al-folio">al-folio</a>
-      year: 2015-now
-      description: A beautiful, simple, clean, and responsive Jekyll theme for academics.
+
+    - title: <a href="https://github.com/isneslab/wendigo">Wendigo</a>
+      year: 2024 - Now
+      description: A deep reinforcement learning approach for DoS query discovery in GraphQL
 
 - title: Honors and Awards
   type: time_table
   contents:
-    - year: 1921
+    - year: 2023
       items:
-        - Nobel Prize in Physics
-        - Matteucci Medal
-    - year: 2029
+        - Layton Research Award
+        - Alan Fairbourn Memorial Prize
+        - Associateship of King's College
+    - year: 2022
       items:
-        - Max Planck Medal
+        - King's Experience Research Award
+    - year: 2020
+      items:
+        - Governor General Academic Medal
+
 
 - title: Academic Interests
   type: nested_list
   contents:
-    - title: Topic 1.
+    - title: Artificial Intelligence.
       items:
-        - Description 1.
-        - Description 2.
-    - title: Topic 2.
+        - Deep reinforcement learning applications for Cybersecurity.
+        - Supervised learning for malware classification.
+    - title: Cybersecurity.
       items:
-        - Description 1.
-        - Description 2.
+        - Vulnerability discovery.
+        - Evasion of machine learning models.
+        - Autonomous cyber defence.
 
-- title: Other Interests
-  type: list
+- title: Fencing
+  type: time_table
   contents:
-    - <u>Hobbies:</u> Hobby 1, Hobby 2, etc.
+    - year: 2022-2024
+      items:
+        - Captain of the Men's First Fencing Team, King's College London
+    - year: 2017-2020
+      items:
+        - Canadian National Fencing Team
+    - year: 2020
+      items:
+        - Fencing Grand Prix Montreal
+    - year: 2019
+      items:
+        - U18 Fencing Team Canada
+        - U18 Fencing World Championships
+        - U18 Fencing Pan American Championships
+    - year: 2018
+      items:
+        - Commonwealth Fencing Championships
