@@ -1,12 +1,29 @@
 "USENIX Sec":
-  color: "#00369f"
+  color: "#C00000"
 
 "IEEE S&P":
-  color: "#00369f"
+  color: "#000000"
 
+"DLSP":
+  color: "#000000"
 
 "AISec":
-  color: "#3f9915"
+  color: "#1B00E0"
+
+"CCS":
+  color: "#1B00E0"
+
+"CCS Poster":
+  color: "#1B00E0"
 
 "arXiv":
-  color: "#ffc908"
+  color: "#B9290A"
+
+"BSc":
+  color: "#565656"
+
+"ACSAC":
+  color: "#52862D"
+
+"ARTMAN":
+  color: "#059800"

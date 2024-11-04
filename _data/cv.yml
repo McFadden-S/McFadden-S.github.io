@@ -41,7 +41,7 @@
 
     - title: King's Undergraduate Research Fellow
       institution: King's College London
-      year: 2024 - Now
+      year: 2023 - 2023
       description: Evaluation of the impact of poisoning on machine learning classifiers for malware detection.
 
 - title: Open Source Projects
@@ -50,7 +50,15 @@
 
     - title: <a href="https://github.com/isneslab/wendigo">Wendigo</a>
       year: 2024 - Now
-      description: A deep reinforcement learning approach for DoS query discovery in GraphQL
+      description: A deep reinforcement learning approach for DoS query discovery in GraphQL.
+
+    - title: <a href="https://github.com/s2labres/tesseract-ml-release">tesseract-ml</a>
+      year: 2024 - Now
+      description: Eliminating experimental bias in malware classification across space and time.
+
+    - title: <a href="https://github.com/s2labres/RPAL">RPAL</a>
+      year: 2024 - Now
+      description: Evaluating the passive recovery of malware classifiers from data poisoning.
 
 - title: Honors and Awards
   type: time_table
@@ -77,8 +85,9 @@
         - Supervised learning for malware classification.
     - title: Cybersecurity.
       items:
+        - Malware classification
         - Vulnerability discovery.
-        - Evasion of machine learning models.
+        - Adversarial machine learning.
         - Autonomous cyber defence.
 
 - title: Fencing
