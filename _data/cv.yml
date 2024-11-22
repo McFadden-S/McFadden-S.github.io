@@ -13,10 +13,10 @@
   contents:
     - title: PhD Candidate
       institution: King's College London, Unitied Kingdom
-      year: 2023 - Now
+      year: 2023 - Present
       description:
         - Currently in Progress
-        - Thesis on "Applications of Deep Reinforcement Learning for Cybersecurity - Exploitation, Evasion and Strategy".
+        - Thesis on "Applications of Deep Reinforcement Learning for Cybersecurity".
 
     - title: BSc (Hons) Computer Science (Artificial Intelligence)
       institution: King's College London, Unitied Kingdom
@@ -31,17 +31,17 @@
 
     - title: Visiting Collaborator
       institution: Artificial Intelligence for Cyber Defence (AICD) Research Centre, The Alan Turing Institute
-      year: 2023 - Now
+      year: 2023 - Present
       description:
 
     - title: Visiting Researcher
       institution: Systems Security Lab (S2Lab), University College London
-      year: 2024 - Now
+      year: 2024 - Present
       description:
 
     - title: King's Undergraduate Research Fellow
       institution: King's College London
-      year: 2023 - 2023
+      year: 2022 - 2022
       description: Evaluation of the impact of poisoning on machine learning classifiers for malware detection.
 
 - title: Open Source Projects
@@ -63,6 +63,9 @@
 - title: Honors and Awards
   type: time_table
   contents:
+    - year: 2024
+      items:
+        - AISec Top Reviewer
     - year: 2023
       items:
         - Layton Research Award
