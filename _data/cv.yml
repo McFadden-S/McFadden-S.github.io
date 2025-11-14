@@ -52,9 +52,9 @@
       year: 2025 - Now
       description: DRL-based malware detection under concept drift.
 
-   - title: <a href="https://github.com/alan-turing-institute/mumoRAG-attacks">mumoRAG-Attacks</a>
-     year: 2025 - Now
-     description: Evaluating the vulnerability of multi-modal RAG pipelines.
+    - title: <a href="https://github.com/alan-turing-institute/mumoRAG-attacks">mumoRAG-Attacks</a>
+      year: 2025 - Now
+      description: Evaluating the vulnerability of multi-modal RAG pipelines.
 
     - title: <a href="https://github.com/s2labres/RPAL">RPAL</a>
       year: 2024 - Now
