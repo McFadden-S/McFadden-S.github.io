@@ -5,4 +5,4 @@ inline: true
 related_posts: false
 ---
 
-Our passive recovery paper has been accepted to the ARTMAN workshop co-located with ACSAC.
+Passive recovery paper accepted at the ARTMAN workshop co-located with ACSAC.

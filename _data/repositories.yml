@@ -2,7 +2,8 @@ github_users:
   - McFadden-S
 
 github_repos:
-  - isneslab/Wendigo
-  - s2labres/tesseract-ml-release
-  - s2labres/RPAL
+  - s2labres/DRMD
   - alan-turing-institute/mumoRAG-attacks
+  - isneslab/Wendigo
+  - s2labres/RPAL
+  - s2labres/tesseract-ml-release

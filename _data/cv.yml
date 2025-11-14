@@ -48,6 +48,18 @@
   type: time_table
   contents:
 
+    - title: <a href="https://github.com/s2labres/DRMD">DRMD</a>
+      year: 2025 - Now
+      description: DRL-based malware detection under concept drift.
+
+   - title: <a href="https://github.com/alan-turing-institute/mumoRAG-attacks">mumoRAG-Attacks</a>
+     year: 2025 - Now
+     description: Evaluating the vulnerability of multi-modal RAG pipelines.
+
+    - title: <a href="https://github.com/s2labres/RPAL">RPAL</a>
+      year: 2024 - Now
+      description: Evaluating the passive recovery of malware classifiers from data poisoning.
+
     - title: <a href="https://github.com/isneslab/wendigo">Wendigo</a>
       year: 2024 - Now
       description: A deep reinforcement learning approach for DoS query discovery in GraphQL.
@@ -55,10 +67,6 @@
     - title: <a href="https://github.com/s2labres/tesseract-ml-release">tesseract-ml</a>
       year: 2024 - Now
       description: Eliminating experimental bias in malware classification across space and time.
-
-    - title: <a href="https://github.com/s2labres/RPAL">RPAL</a>
-      year: 2024 - Now
-      description: Evaluating the passive recovery of malware classifiers from data poisoning.
 
 - title: Honors and Awards
   type: time_table
