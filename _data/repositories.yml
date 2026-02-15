@@ -8,7 +8,7 @@ s2labres/DRMD:
   owner:
     login: s2labres
   topics:
-    - aaai2026,
+    - aaai2026
     - active-learning
     - classification-with-rejection
     - concept-drift
@@ -65,4 +65,4 @@ s2labres/tesseract-ml-release:
     login: s2labres
   topics:
     - temporal-data
-    - malware-detection 
+    - malware-detection
