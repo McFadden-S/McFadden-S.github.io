@@ -1119,12 +1119,12 @@ swiper-container {
   padding: 1.25rem;
   margin-bottom: 1.5rem;
   border-radius: 10px;
-  border: 1px solid $grey-color-light;
-  background-color: $white-color;
+  border: 1px solid $grey-color-dark;
+  background-color: lighten($grey-color-dark, 12%);
   transition: 0.2s ease;
 
   &:hover {
-    box-shadow: 0 6px 18px rgba($black-color, 0.08);
+    box-shadow: 0 6px 18px rgba($black-color, 0.4);
     transform: translateY(-2px);
     border-color: $blue-color;
   }
@@ -1143,14 +1143,14 @@ swiper-container {
 }
 
 .repo-owner {
-  color: $grey-color;
+  color: lighten($grey-color, 20%);
 }
 
 .repo-name {
-  color: $blue-color;
+  color: lighten($blue-color, 10%);
 
   &:hover {
-    color: $blue-color-dark;
+    color: $blue-color;
   }
 }
 
@@ -1159,7 +1159,7 @@ swiper-container {
   font-size: 0.95rem;
   line-height: 1.5;
   margin-bottom: 0.75rem;
-  color: $grey-900;
+  color: $grey-color-light;
 }
 
 /* Topics container */
@@ -1173,6 +1173,6 @@ swiper-container {
   padding: 3px 8px;
   border-radius: 12px;
   font-weight: 500;
-  background-color: $code-bg-color-light;
-  color: $purple-color;
+  background-color: rgba($purple-color, 0.25);
+  color: $light-purple-color;
 }
