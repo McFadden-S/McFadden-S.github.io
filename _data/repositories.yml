@@ -4,7 +4,7 @@
 s2labres/DRMD:
   name: DRMD
   html_url: https://github.com/s2labres/DRMD
-  description: Code library for the DRMD framework from 'DRMD: Deep Reinforcement Learning for Malware Detection under Concept Drift'.
+  description: "Code library for the DRMD framework from 'DRMD: Deep Reinforcement Learning for Malware Detection under Concept Drift'."
   owner:
     login: s2labres
   topics:
@@ -21,7 +21,7 @@ s2labres/DRMD:
 alan-turing-institute/mumoRAG-attacks:
   name: mumoRAG-attacks
   html_url: https://github.com/alan-turing-institute/mumoRAG-attacks
-  description: Adversarial and poisoning attacks against multimodal retrieval-augmented generation (RAG).
+  description: "Adversarial and poisoning attacks against multimodal retrieval-augmented generation (RAG)."
   owner:
     login: alan-turing-institute
   topics:
@@ -33,7 +33,7 @@ alan-turing-institute/mumoRAG-attacks:
 isneslab/Wendigo:
   name: Wendigo
   html_url: https://github.com/isneslab/Wendigo
-  description: Code library for the Wendigo framework from 'Wendigo: Deep Reinforcement Learning for Denial-of-Service Query Discovery in GraphQL'.
+  description: "Code library for the Wendigo framework from 'Wendigo: Deep Reinforcement Learning for Denial-of-Service Query Discovery in GraphQL'."
   owner:
     login: isneslab
   topics:
@@ -46,7 +46,7 @@ isneslab/Wendigo:
 s2labres/RPAL:
   name: RPAL
   html_url: https://github.com/s2labres/RPAL
-  description: Code library for the RPAL framework from 'The Impact of Active Learning on Availability Data Poisoning for Android Malware Classifiers'.
+  description: "Code library for the RPAL framework from 'The Impact of Active Learning on Availability Data Poisoning for Android Malware Classifiers'."
   owner:
     login: s2labres
   topics:
@@ -60,7 +60,7 @@ s2labres/RPAL:
 s2labres/tesseract-ml-release:
   name: tesseract-ml-release
   html_url: https://github.com/s2labres/tesseract-ml-release
-  description: Code library for the Tesseract framework from 'TESSERACT: Eliminating experimental bias in malware classification across space and time'.
+  description: "Code library for the Tesseract framework from 'TESSERACT: Eliminating experimental bias in malware classification across space and time'."
   owner:
     login: s2labres
   topics:
