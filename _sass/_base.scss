@@ -1109,3 +1109,70 @@ swiper-container {
     border-bottom: 2px solid var(--global-text-color);
   }
 }
+
+/* ===============================
+   Repository Cards
+================================= */
+
+.repo-card {
+  flex: 0 0 48%;
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  border-radius: 10px;
+  border: 1px solid $grey-color-light;
+  background-color: $white-color;
+  transition: 0.2s ease;
+
+  &:hover {
+    box-shadow: 0 6px 18px rgba($black-color, 0.08);
+    transform: translateY(-2px);
+    border-color: $blue-color;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}
+
+/* Header */
+.repo-header {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.repo-owner {
+  color: $grey-color;
+}
+
+.repo-name {
+  color: $blue-color;
+
+  &:hover {
+    color: $blue-color-dark;
+  }
+}
+
+/* Description */
+.repo-description {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+  color: $grey-900;
+}
+
+/* Topics container */
+.repo-topics {
+  font-size: 0.8rem;
+}
+
+/* Topic tags */
+.repo-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  background-color: $code-bg-color-light;
+  color: $purple-color;
+}

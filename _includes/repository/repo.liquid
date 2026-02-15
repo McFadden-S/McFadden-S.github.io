@@ -18,7 +18,7 @@
     {% if repo_data.topics %}
       <div class="repo-topics">
         {% for topic in repo_data.topics %}
-          <span class="repo-tag">{{ topic }}</span>
+          <span class="repo-tag">{{ topic }}</span>{% unless forloop.last %}, {% endunless %}
         {% endfor %}
       </div>
     {% endif %}
