@@ -4,7 +4,7 @@
 s2labres/DRMD:
   name: DRMD
   html_url: https://github.com/s2labres/DRMD
-  description: Code library for the DRMD framework from 'DRMD: Deep Reinforcement Learning for Malware Detection under Concept Drift.
+  description: Code library for the DRMD framework from 'DRMD: Deep Reinforcement Learning for Malware Detection under Concept Drift'.
   owner:
     login: s2labres
   topics:
@@ -29,3 +29,40 @@ alan-turing-institute/mumoRAG-attacks:
     - RAG
     - multimodal
     - LLMs
+
+isneslab/Wendigo:
+  name: Wendigo
+  html_url: https://github.com/isneslab/Wendigo
+  description: Code library for the Wendigo framework from 'Wendigo: Deep Reinforcement Learning for Denial-of-Service Query Discovery in GraphQL'.
+  owner:
+    login: isneslab
+  topics:
+    - graphql
+    - dos
+    - deep-reinforcement-learning
+    - blackbox-testing
+    - dlsp2024
+
+s2labres/RPAL:
+  name: RPAL
+  html_url: https://github.com/s2labres/RPAL
+  description: Code library for the RPAL framework from 'The Impact of Active Learning on Availability Data Poisoning for Android Malware Classifiers'.
+  owner:
+    login: s2labres
+  topics:
+    - recovery
+    - active-learning
+    - temporal-data
+    - malware-detection
+    - poisoning-attack
+    - artman2025
+
+s2labres/tesseract-ml-release:
+  name: tesseract-ml-release
+  html_url: https://github.com/s2labres/tesseract-ml-release
+  description: Code library for the Tesseract framework from 'TESSERACT: Eliminating experimental bias in malware classification across space and time'.
+  owner:
+    login: s2labres
+  topics:
+    - temporal-data
+    - malware-detection 
