@@ -1,37 +1,26 @@
-{% assign repo_url = include.repository | split: '/' %}
-{% if site.data.repositories.github_users contains repo_url.first %}
-  {% assign show_owner = false %}
-{% else %}
-  {% assign show_owner = true %}
-{% endif %}
+{% assign repo_parts = include.repository | split: '/' %}
+{% assign owner = repo_parts[0] %}
+{% assign repo = repo_parts[1] %}
 
-<div class="repo p-2 text-center">
-  <a href="https://github.com/{{ include.repository }}">
-    {% assign repo_parts = include.repository | split: '/' %}
-    {% assign owner = repo_parts[0] %}
-    {% assign repo = repo_parts[1] %}
+{% assign repo_data = site.data.github_repos[include.repository] %}
 
-    {% assign repo_data = site.data.github_repos[include.repository] %}
+<div class="repo-card">
+  <a href="{{ repo_data.html_url }}" target="_blank">
+    <h3>
+      <span class="repo-owner">{{ repo_data.owner.login }}</span> /
+      <span class="repo-name">{{ repo_data.name }}</span>
+    </h3>
 
-    <div class="repo-card">
-      <a href="{{ repo_data.html_url }}" target="_blank">
-      <h3>
-        <span class="repo-owner">{{ repo_data.owner.login }}</span> /
-        <span class="repo-name">{{ repo_data.name }}</span>
-      </h3>
+    <p class="repo-description">
+      {{ repo_data.description }}
+    </p>
 
-      <p class="repo-description">
-        {{ repo_data.description }}
-      </p>
-
-      {% if repo_data.topics %}
-        <div class="repo-topics">
-          {% for topic in repo_data.topics %}
-            <span class="repo-tag">{{ topic }}</span>
-          {% endfor %}
-        </div>
-      {% endif %}
-      </a>
-    </div>
+    {% if repo_data.topics %}
+      <div class="repo-topics">
+        {% for topic in repo_data.topics %}
+          <span class="repo-tag">{{ topic }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
   </a>
 </div>
