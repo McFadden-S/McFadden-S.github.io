@@ -7,15 +7,31 @@
 
 <div class="repo p-2 text-center">
   <a href="https://github.com/{{ include.repository }}">
-    <img
-      class="repo-img-light w-100"
-      alt="{{ include.repository }}"
-      src="https://github-readme-stats.vercel.app/api/pin/?username={{ repo_url[0] }}&repo={{ repo_url[1] }}&theme={{ site.repo_theme_light }}&show_owner={{ show_owner }}"
-    >
-    <img
-      class="repo-img-dark w-100"
-      alt="{{ include.repository }}"
-      src="https://github-readme-stats.vercel.app/api/pin/?username={{ repo_url[0] }}&repo={{ repo_url[1] }}&theme={{ site.repo_theme_dark }}&show_owner={{ show_owner }}"
-    >
+    {% assign repo_parts = include.repository | split: '/' %}
+    {% assign owner = repo_parts[0] %}
+    {% assign repo = repo_parts[1] %}
+
+    {% assign repo_data = site.data.github_repos[include.repository] %}
+
+    <div class="repo-card">
+      <a href="{{ repo_data.html_url }}" target="_blank">
+      <h3>
+        <span class="repo-owner">{{ repo_data.owner.login }}</span> /
+        <span class="repo-name">{{ repo_data.name }}</span>
+      </h3>
+
+      <p class="repo-description">
+        {{ repo_data.description }}
+      </p>
+
+      {% if repo_data.topics %}
+        <div class="repo-topics">
+          {% for topic in repo_data.topics %}
+            <span class="repo-tag">{{ topic }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+      </a>
+    </div>
   </a>
 </div>
