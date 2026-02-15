@@ -1,9 +1,31 @@
-github_users:
-  - McFadden-S
 
-github_repos:
-  - s2labres/DRMD
-  - alan-turing-institute/mumoRAG-attacks
-  - isneslab/Wendigo
-  - s2labres/RPAL
-  - s2labres/tesseract-ml-release
+
+
+s2labres/DRMD:
+  name: DRMD
+  html_url: https://github.com/s2labres/DRMD
+  description: Code library for the DRMD framework from 'DRMD: Deep Reinforcement Learning for Malware Detection under Concept Drift.
+  owner:
+    login: s2labres
+  topics:
+    - aaai2026,
+    - active-learning
+    - classification-with-rejection
+    - concept-drift
+    - deep-reinforcement-learning
+    - drl
+    - malware-detection
+    - rejection
+    - rejection-sampling
+
+alan-turing-institute/mumoRAG-attacks:
+  name: mumoRAG-attacks
+  html_url: https://github.com/alan-turing-institute/mumoRAG-attacks
+  description: Adversarial and poisoning attacks against multimodal retrieval-augmented generation (RAG).
+  owner:
+    login: alan-turing-institute
+  topics:
+    - adversarial-ml
+    - RAG
+    - multimodal
+    - LLMs
