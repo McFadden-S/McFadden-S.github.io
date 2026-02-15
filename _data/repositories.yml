@@ -1,5 +1,10 @@
 
-
+github_repos:
+  - s2labres/DRMD
+  - alan-turing-institute/mumoRAG-attacks
+  - isneslab/Wendigo
+  - s2labres/RPAL
+  - s2labres/tesseract-ml-release
 
 s2labres/DRMD:
   name: DRMD
