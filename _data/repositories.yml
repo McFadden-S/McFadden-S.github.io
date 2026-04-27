@@ -5,6 +5,7 @@ github_repos:
   - isneslab/Wendigo
   - s2labres/RPAL
   - s2labres/tesseract-ml-release
+  - McFadden-S/MARSim
 
 s2labres/DRMD:
   name: DRMD
@@ -71,3 +72,15 @@ s2labres/tesseract-ml-release:
   topics:
     - temporal-data
     - malware-detection
+
+McFadden-S/MARSim:
+  name: MARSim
+  html_url: https://github.com/McFadden-S/MARSim
+  description: Multi-agent reinforcement learning environment for partially observable drone swarm attack and defence of a UGV resupply mission.
+  owner:
+    login: McFadden-S
+  topics:
+    - drone
+    - swarm
+    - defense
+    - drl
