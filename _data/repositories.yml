@@ -27,8 +27,8 @@ s2labres/DRMD:
 
 alan-turing-institute/DRL4Sec-Pitfalls:
   name: DRL4Sec-Pitfalls
-  html_url: https://github.com/alan-turing-institute/DRL4Sec-Pitfallss
-  description: Code library for the case studies from 'SoK: The Pitfalls of Deep Reinforcement Learning for Cybersecurity'.
+  html_url: https://github.com/alan-turing-institute/DRL4Sec-Pitfalls
+  description: "Code library for the case studies from 'SoK: The Pitfalls of Deep Reinforcement Learning for Cybersecurity'."
   owner:
     login: alan-turing-institute
   topics:
