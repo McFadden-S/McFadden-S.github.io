@@ -1,6 +1,7 @@
 
 github_repos:
   - s2labres/DRMD
+  - alan-turing-institute/DRL4Sec-Pitfalls
   - alan-turing-institute/mumoRAG-attacks
   - isneslab/Wendigo
   - s2labres/RPAL
@@ -23,6 +24,18 @@ s2labres/DRMD:
     - malware-detection
     - rejection
     - rejection-sampling
+
+alan-turing-institute/DRL4Sec-Pitfalls:
+  name: DRL4Sec-Pitfalls
+  html_url: https://github.com/alan-turing-institute/DRL4Sec-Pitfallss
+  description: Code library for the case studies from 'SoK: The Pitfalls of Deep Reinforcement Learning for Cybersecurity'.
+  owner:
+    login: alan-turing-institute
+  topics:
+    - cybersecurity
+    - case-study
+    - drl
+    - pitfalls
 
 alan-turing-institute/mumoRAG-attacks:
   name: mumoRAG-attacks
