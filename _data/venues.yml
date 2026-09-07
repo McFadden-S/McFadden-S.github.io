@@ -8,7 +8,7 @@
   color: "#000000"
 
 "AISec":
-  color: "#1B00E0"
+  color: "#000000"
 
 "CCS":
   color: "#1B00E0"
@@ -26,4 +26,22 @@
   color: "#52862D"
 
 "ARTMAN":
-  color: "#059800"
+  color: "#52862Dx"
+
+"AAAI":
+  color: "#660bc6"
+
+"S&P Workshop":
+  color: "#000000"
+
+"ACSAC Workshop":
+  color: "#000000"
+
+"ACSAC Competition":
+  color: "#4c4c4c"
+
+"AAMAS Workshop":
+  color: "#000000"
+
+"ACL Workshop":
+  color: "#000000"
