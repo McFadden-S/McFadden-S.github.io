@@ -17,7 +17,7 @@
   color: "#1B00E0"
 
 "arXiv":
-  color: "#B9290A"
+  color: "#555555"
 
 "BSc":
   color: "#565656"
@@ -29,19 +29,19 @@
   color: "#52862Dx"
 
 "AAAI":
-  color: "#660bc6"
+  color: "#450189"
 
 "S&P Workshop":
-  color: "#000000"
+  color: "#111111"
 
 "ACSAC Workshop":
-  color: "#000000"
+  color: "#117204"
 
-"ACSAC Competition":
+"ACSAC Comp":
   color: "#4c4c4c"
 
 "AAMAS Workshop":
-  color: "#000000"
+  color: "#357bf4"
 
 "ACL Workshop":
-  color: "#000000"
+  color: "#f94a4a"
