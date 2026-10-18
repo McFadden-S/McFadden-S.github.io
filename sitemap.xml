@@ -1,1 +1,18 @@
-<?xml version="1.0" encoding="UTF-8"?> <urlset xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd" xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"> <url> <loc>https://mcfadden-s.github.io/news/announcement_1/</loc> <lastmod>2024-05-14T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/news/announcement_2/</loc> <lastmod>2024-10-25T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/news/announcement_3/</loc> <lastmod>2024-11-01T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/news/announcement_4/</loc> <lastmod>2025-11-07T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/news/announcement_5/</loc> <lastmod>2025-11-09T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/news/announcement_6/</loc> <lastmod>2026-05-07T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/news/announcement_7/</loc> <lastmod>2026-08-12T00:00:00+00:00</lastmod> </url> <url> <loc>https://mcfadden-s.github.io/</loc> </url> <url> <loc>https://mcfadden-s.github.io/cv/</loc> </url> <url> <loc>https://mcfadden-s.github.io/news/</loc> </url> <url> <loc>https://mcfadden-s.github.io/projects/</loc> </url> <url> <loc>https://mcfadden-s.github.io/publications/</loc> </url> <url> <loc>https://mcfadden-s.github.io/repositories/</loc> </url> <url> <loc>https://mcfadden-s.github.io/blog/</loc> </url> </urlset>
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://shaemcfadden.co.uk/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/cv/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/acdenv/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/alpoison/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/direction/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/drmd/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/onepic-short/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/onepic/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/replicant/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/rpal/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/sok/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/tesseract/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/papers/wendigo/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/publications/</loc></url>
+  <url><loc>https://shaemcfadden.co.uk/repositories/</loc></url>
+</urlset>
