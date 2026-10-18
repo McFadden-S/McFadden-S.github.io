@@ -1,0 +1,84 @@
+---
+import Base from '../layouts/Base.astro';
+import { cv, asset } from '../data/site';
+---
+<Base title="CV" active="cv">
+  <div class="wrap">
+    <header class="page-head">
+      <h1 class="wide">CV</h1>
+      <div class="btn-row" style="margin-top:28px">
+        <a class="btn primary" data-augmented-ui="tl-clip br-clip border" href={asset('CV.pdf')}>CV as PDF</a>
+      </div>
+    </header>
+
+    <section class="cv-section">
+      <h2>General Information</h2>
+      <dl class="cv-dl">
+        {cv.general.map((g) => <><dt>{g.name}</dt><dd>{g.value}</dd></>)}
+      </dl>
+    </section>
+
+    <section class="cv-section">
+      <h2>Education</h2>
+      <div class="cv-rows">
+        {cv.education.map((e) => (
+          <div class="cv-row">
+            <span class="yr">{e.year}</span>
+            <div><h3>{e.title}</h3><p class="inst">{e.institution}</p><ul>{e.description.map((d) => <li>{d}</li>)}</ul></div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="cv-section">
+      <h2>Experience</h2>
+      <div class="cv-rows">
+        {cv.experience.map((e) => (
+          <div class="cv-row">
+            <span class="yr">{e.year}</span>
+            <div><h3>{e.title}</h3><p class="inst">{e.institution}</p><ul>{e.description.map((d) => <li>{d}</li>)}</ul></div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="cv-section">
+      <h2>Open Source Projects</h2>
+      <div class="cv-rows">
+        {cv.openSource.map((o) => (
+          <div class="cv-row">
+            <span class="yr">{o.year}</span>
+            <div><h3><a href={o.href}>{o.title}</a></h3><p class="inst" style="margin-bottom:0">{o.description}</p></div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <section class="cv-section">
+      <h2>Honors and Awards</h2>
+      <div class="cv-rows">
+        {cv.honors.map((h) => (
+          <div class="cv-row"><span class="yr">{h.year}</span><ul>{h.items.map((i) => <li>{i}</li>)}</ul></div>
+        ))}
+      </div>
+    </section>
+
+    <section class="cv-section">
+      <h2>Academic Interests</h2>
+      <div class="cv-rows">
+        {cv.interests.map((g) => (
+          <div><h3 style="font-size:18px;font-weight:640">{g.title}</h3><ul style="margin:8px 0 0;padding-left:1.1em">{g.items.map((i) => <li>{i}</li>)}</ul></div>
+        ))}
+      </div>
+    </section>
+
+    <section class="cv-section">
+      <h2>Fencing</h2>
+      <div class="cv-rows">
+        {cv.fencing.map((h) => (
+          <div class="cv-row"><span class="yr">{h.year}</span><ul>{h.items.map((i) => <li>{i}</li>)}</ul></div>
+        ))}
+      </div>
+    </section>
+  </div>
+</Base>

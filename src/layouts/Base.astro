@@ -1,0 +1,57 @@
+---
+import '@fontsource-variable/archivo/standard.css';
+import 'augmented-ui/augmented-ui.min.css';
+import '../styles/global.css';
+import { profile } from '../data/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  active?: 'publications' | 'repositories' | 'cv';
+}
+const { title, description = profile.bio[0], active } = Astro.props;
+const fullTitle = title ? `${title} | ${profile.name}` : profile.name;
+const nav = [
+  { href: '/publications/', label: 'Publications', key: 'publications' },
+  { href: '/repositories/', label: 'Repositories', key: 'repositories' },
+  { href: '/cv/', label: 'CV', key: 'cv' },
+];
+---
+<!doctype html>
+<html lang="en" data-crt="on">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#111111" />
+    <script is:inline>try { if (localStorage.getItem('crt') === 'off') document.documentElement.dataset.crt = 'off'; } catch (e) {}</script>
+    <link rel="preload" href="/fonts/departure-mono/DepartureMono-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true"><div class="backdrop__floor"><div class="backdrop__lines"></div></div><div class="backdrop__mask"></div></div>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href="/" aria-label={`${profile.name}, home`}><b><span class="full">{profile.name}</span><span class="abbr">SM</span></b></a>
+        <nav class="site-nav" aria-label="Site">
+          {nav.map((n) => <a href={n.href} aria-current={active === n.key ? 'page' : undefined}>{n.label}</a>)}
+        </nav>
+        <button class="crt-toggle" type="button" aria-pressed="true" data-crt-toggle title="Scanlines, flicker and glow">CRT</button>
+      </div>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-foot">
+      <div class="wrap">
+        <span>© 2026 {profile.name}</span>
+        <span>Built with <a href="https://astro.build">Astro</a> and <a href="https://augmented-ui.com">augmented-ui</a>. Set in Archivo and <a href="https://departuremono.com">Departure Mono</a>.</span>
+      </div>
+    </footer>
+    <div class="crt" aria-hidden="true"></div>
+    <script>
+      import '../scripts/ui.ts';
+    </script>
+  </body>
+</html>

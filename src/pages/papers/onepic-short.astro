@@ -1,0 +1,357 @@
+---
+import Paper from '../../layouts/Paper.astro';
+const sections = [
+  { id: 'intro', label: 'Introduction' },
+  { id: 'pipeline', label: 'VD-RAG pipeline' },
+  { id: 'attack', label: 'Poisoning attacks' },
+  { id: 'setup', label: 'Experiment design' },
+  { id: 'results', label: 'Results' },
+  { id: 'limitations', label: 'Limitations' },
+  { id: 'conclusion', label: 'Conclusion' },
+];
+
+const T1: [string, string, string, number, number, number, number, number][] = [
+  ['ViDoRe-V1-AI', 'CLIP-L', 'SmolVLM', 0.210, 0.000, 1.000, 1.000, 1.000],
+  ['ViDoRe-V1-AI', 'CLIP-L', 'Qwen2.5-3B', 0.210, 0.010, 1.000, 1.000, 1.000],
+  ['ViDoRe-V1-AI', 'Jina-CLIP', 'SmolVLM', 0.000, 0.000, 0.750, 0.900, 0.951],
+  ['ViDoRe-V1-AI', 'Jina-CLIP', 'Qwen2.5-3B', 0.000, 0.000, 0.750, 0.950, 0.987],
+  ['ViDoRe-V1-AI', 'ColPali', 'SmolVLM', 0.660, 0.650, 0.000, 0.900, 0.946],
+  ['ViDoRe-V1-AI', 'ColPali', 'Qwen2.5-3B', 0.660, 0.650, 0.000, 1.000, 1.000],
+  ['ViDoRe-V2-ESG', 'CLIP-L', 'SmolVLM', 0.134, 0.018, 0.818, 1.000, 1.000],
+  ['ViDoRe-V2-ESG', 'CLIP-L', 'Qwen2.5-3B', 0.134, 0.018, 0.818, 1.000, 1.000],
+  ['ViDoRe-V2-ESG', 'Jina-CLIP', 'SmolVLM', 0.000, 0.000, 1.000, 1.000, 1.000],
+  ['ViDoRe-V2-ESG', 'Jina-CLIP', 'Qwen2.5-3B', 0.000, 0.000, 1.000, 0.818, 0.991],
+  ['ViDoRe-V2-ESG', 'ColPali', 'SmolVLM', 0.519, 0.460, 0.091, 1.000, 1.000],
+  ['ViDoRe-V2-ESG', 'ColPali', 'Qwen2.5-3B', 0.519, 0.499, 0.091, 1.000, 1.000],
+];
+const f3 = (v: number) => v.toFixed(3);
+const METRICS = [
+  { id: 't1-asrr', col: 5, name: 'ASR-R', bar: 'hb-a', sub: 'Fraction of queries for which the malicious image is retrieved by R.' },
+  { id: 't1-hard', col: 6, name: 'ASR-G-Hard', bar: 'hb-a', sub: 'Fraction of queries for which the VLM outputs a* verbatim, assuming the malicious image is retrieved.' },
+  { id: 't1-soft', col: 7, name: 'ASR-G-Soft', bar: 'hb-a', sub: 'Average embedding similarity between the VLM response and a*, assuming the malicious image is retrieved.' },
+  { id: 't1-recb', col: 3, name: 'Recall-B', bar: 'hb-n', sub: 'Fraction of queries for which R retrieves a relevant image prior to attack.' },
+  { id: 't1-reca', col: 4, name: 'Recall-A', bar: 'hb-n', sub: 'Fraction of queries for which R retrieves a relevant image after the attack.' },
+];
+const tip = (r: (typeof T1)[number]) =>
+  `${r[0]}: ${r[1]} + ${r[2]}|Recall-B ${f3(r[3])}, Recall-A ${f3(r[4])}|ASR-R ${f3(r[5])}|ASR-G-Hard ${f3(r[6])}, ASR-G-Soft ${f3(r[7])}`;
+---
+<Paper id="onepic-short" affils={['The Alan Turing Institute', 'University College London', 'King’s College London']} sections={sections}>
+  <Fragment slot="abstract">
+    <p>Multimodal retrieval augmented generation (M-RAG) has recently emerged as a method to inhibit hallucinations of large multimodal models (LMMs) through a factual knowledge base (KB). However, M-RAG also introduces new attack vectors for adversaries that aim to disrupt the system by injecting malicious entries into the KB. In this work, we present a poisoning attack against M-RAG targeting visual document retrieval applications, where the KB contains images of document pages. Our objective is to craft a single image that is retrieved for a variety of different user queries, and consistently influences the output produced by the generative model, thus creating a universal denial-of-service (DoS) attack against the M-RAG system. We demonstrate that while our attack is effective against a diverse range of widely-used, state-of-the-art retrievers (embedding models) and generators (LMMs), it can also be ineffective against robust embedding models. Our attack not only highlights the vulnerability of M-RAG pipelines to poisoning attacks, but also sheds light on a fundamental weakness that potentially hinders their performance even in benign settings.</p>
+  </Fragment>
+
+  <section class="psec" id="intro">
+    <h2>Introduction</h2>
+    <div class="prose">
+      <p>Large multimodal models (LMMs) enable a wide range of zero-shot capabilities spanning a variety of input modalities, such as language, vision, and audio. However, similar to unimodal large language models (LLMs), they can suffer from hallucinations, generating outputs that are not grounded in factual information. Retrieval augmented generation (RAG) attempts to address this issue by retrieving trusted information chunks, that are relevant to the user query, directly from a knowledge base (KB). The retrieved information is then included in the input to the generative model to inform its generation.</p>
+      <p>The effectiveness of RAG relies primarily on the trustworthiness of the information in the KB. Challenging this assumption, recent work has shown that textual RAG pipelines are vulnerable to poisoning attacks, where an attacker injects malicious information into the KB. To create an impactful attack, the injected information must simultaneously (1) have a high chance of being retrieved, and (2) influence the output of the generative model. These attacks have recently been extended to multimodal RAG (M-RAG) pipelines by concurrent research.</p>
+      <p>Both of those concurrent works consider that the user queries and the KB consist of text-image pairs, thus the text modality is common between queries, KB items, and LMM outputs. This shared modality greatly simplifies the attack procedure.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 720 290" role="img" aria-label="Comparison. In concurrent multimodal RAG attacks, a text-image query matches an injected entry whose text contains the user request and a malicious response, and the model reads out the malicious response. In VD-RAG, a text query is matched only by image–text similarity to an injected page image with no text field, and the VLM must be steered through the pixels to reply I will not reply to you.">
+        <defs>
+          <marker id="ah-contrast" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="zone" d="M24 10H350V266L336 280H10V24Z"/>
+        <text class="t-mono t-muted" x="26" y="36">CONCURRENT M-RAG ATTACKS</text>
+        <text class="t-sm t-muted" x="26" y="54">KB holds text-image pairs</text>
+        <path class="box" d="M90 70H280V100L270 110H80V80Z"/>
+        <text class="t-b mid" x="180" y="95">text-image query q</text>
+        <path class="ln" d="M180 110 V136" marker-end="url(#ah-contrast)"/>
+        <text class="t-sm t-muted" x="190" y="127">shares text with q</text>
+        <path class="box-red" d="M90 140H280V186L270 196H80V150Z"/>
+        <text class="t-mono t-red mid" x="180" y="162">INJECTED KB ENTRY</text>
+        <text class="t-sm mid" x="180" y="182">request + malicious response</text>
+        <path class="ln" d="M180 196 V222" marker-end="url(#ah-contrast)"/>
+        <text class="t-sm t-muted" x="190" y="213">LMM reads the text</text>
+        <path class="box" d="M90 226H280V256L270 266H80V236Z"/>
+        <text class="t-b t-red mid" x="180" y="251">malicious response</text>
+
+        <path class="zone" d="M384 10H710V266L696 280H370V24Z"/>
+        <text class="t-mono t-red" x="386" y="36">VD-RAG (THIS PAPER)</text>
+        <text class="t-sm t-muted" x="386" y="54">KB holds document page images only</text>
+        <path class="box" d="M450 70H640V100L630 110H440V80Z"/>
+        <text class="t-b mid" x="540" y="95">text query q</text>
+        <path class="ln" d="M540 110 V136" marker-end="url(#ah-contrast)"/>
+        <text class="t-sm t-muted" x="550" y="127">image–text similarity</text>
+        <path class="box-red" d="M450 140H640V186L630 196H440V150Z"/>
+        <text class="t-mono t-red mid" x="540" y="162">INJECTED PAGE IMAGE I′</text>
+        <text class="t-sm mid" x="540" y="182">pixels only, no text field</text>
+        <path class="ln" d="M540 196 V222" marker-end="url(#ah-contrast)"/>
+        <text class="t-sm t-muted" x="550" y="213">VLM reads the pixels</text>
+        <path class="box" d="M450 226H640V256L630 266H440V236Z"/>
+        <text class="t-sm t-b t-red mid" x="540" y="251">“I will not reply to you!”</text>
+      </svg>
+      </div>
+      <figcaption><b>Concurrent M-RAG attacks and VD-RAG.</b> For instance, an adversary could simply inject the expected user request alongside the malicious response into the KB. This trivial–but effective–attack is not possible in many practical use cases, such as visual document retrieval where the KB consists purely of images (document pages), while both the user queries and the LMM outputs are textual.</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>Therefore, it remains unclear whether M-RAG poisoning would still be possible in this practical setting. In this paper, we aim to bridge this gap in the literature by investigating poisoning attacks on visual document RAG (VD-RAG). We adopt a gradient-based adversarial approach to craft an image that is retrieved, and consistently influences the generation of every possible user query, thus leading to a universal denial-of-service (DoS) attack against the RAG pipeline.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="pipeline">
+    <h2>VD-RAG Pipeline</h2>
+    <div class="prose">
+      <p>A visual document RAG pipeline consists of three main components. First, a knowledge base (KB) <i>K</i> = {'{'}<i>I</i><sub>1</sub>, …, <i>I</i><sub><i>K</i></sub>{'}'} containing a set of <i>K</i> images, each corresponding to a page in a document. Second, a retriever <i>R</i> uses a multimodal embedding model <i>E</i>(.) that projects user queries (text) and KB images into a common vector space. The retriever then computes a similarity score <i>S</i>(<i>E</i>(<i>q</i>), <i>E</i>(<i>I</i>)) between a user query <i>q</i> and each image in <i>I</i> ∈ <i>K</i>. Common similarity metrics for RAG retrievers include cosine similarity and MaxSim. For each user query <i>q</i>, the retriever retrieves the top-<i>k</i> relevant items from <i>K</i> according to the similarity score, where <i>k</i> ≪ |<i>K</i>|. In other words, the retriever computes <i>R</i>(<i>q</i>, <i>K</i>) = top-<i>k</i><sub><i>I</i>∈<i>K</i></sub> <i>S</i>(<i>E</i>(<i>q</i>), <i>E</i>(<i>I</i>)).</p>
+      <p>The third component is a generator <i>G</i> which is a vision language model (VLM) used to generate a response <i>g</i> to the user’s query <i>q</i> with the retrieved images in its context window. That is, <i>g</i> = <i>G</i>(<i>q</i>, <i>R</i>(<i>q</i>, <i>K</i>)).</p>
+    </div>
+  </section>
+
+  <section class="psec" id="attack">
+    <h2>Poisoning Attacks against VD-RAG</h2>
+
+    <h3>Threat Model</h3>
+    <div class="prose">
+      <p>We consider an attacker that aims to disrupt the operation of the visual document RAG system by causing the retriever to retrieve irrelevant images and the generator to generate unhelpful responses to user queries. To achieve this goal, the attacker is capable of injecting documents/images into the KB. In our work, we assume a weak attacker that can inject only one malicious image <i>I′</i> into the KB s.t. <i>K′</i> = <i>K</i> ∪ <i>I′</i>. In order for this malicious image to cause disruption to the RAG pipeline, this image has to be crafted to be retrieved often, and when retrieved, it has to cause the VLM to generate unhelpful responses.</p>
+      <p>We examine both white-box and black-box settings.</p>
+    </div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>White-box</h4><p>In the white-box setting, the attacker is assumed to have knowledge of both the embedding model and the VLM. This is motivated by the vast amount of competent open-source text and multimodal embedding models, as well as VLMs.</p></div>
+      <div class="card"><h4>Black-box</h4><p>In the black-box setting, we consider that the attacker uses other open-source models than those used in the VD-RAG system to craft the malicious image, and we consequently evaluate the transferability between adversarial samples from one model to another.</p></div>
+    </div>
+
+    <h3>Proposed Attack</h3>
+    <div class="prose"><p>A successful RAG poisoning attack must meet two conditions (modified for our goal of a universal untargeted attack).</p></div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Retrieval condition</h4><p>First, the retrieval condition requires that the malicious image is retrieved as often as possible.</p></div>
+      <div class="card"><h4>Generation condition</h4><p>Second, the generation condition requires that when present in the context window, the malicious image must cause the generator to generate a specific response.</p></div>
+    </div>
+    <div class="prose">
+      <p>In order to compute a malicious image <i>I′</i> that meets the above two conditions, we adopt the framework of gradient-based adversarial examples, initially proposed against neural network based image classifiers. In particular we jointly optimize the image to minimize a loss function <i>L</i><sub>RAG</sub> capturing both a retrieval loss <i>L</i><sub>R</sub> and a generation loss <i>L</i><sub>G</sub> as follows</p>
+    </div>
+    <div class="ops-eq" role="group" aria-label="Equation 1" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>L</i><sub>RAG</sub> = λ<sub>R</sub><i>L</i><sub>R</sub> + λ<sub>G</sub><i>L</i><sub>G</sub>,</span><em>(1)</em></div>
+    </div>
+    <div class="prose"><p>where λ<sub>R</sub>, λ<sub>G</sub> are coefficients,</p></div>
+    <div class="ops-eq" role="group" aria-label="Equations 2 and 3" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>L</i><sub>R</sub> = <span class="ops-sum"><small>|<i>Q</i>|</small><span>Σ</span><small><i>i</i>=1</small></span> 1 − <i>S</i>(<i>q</i><sub><i>i</i></sub>, <i>I′</i>)</span><em>(2)</em></div>
+      <div><span><i>L</i><sub>G</sub> = <span class="ops-sum"><small>|<i>Q</i>|</small><span>Σ</span><small><i>i</i>=1</small></span> CE(<i>G</i>(<i>q</i><sub><i>i</i></sub>, <i>R</i>(<i>q</i><sub><i>i</i></sub>, <i>K′</i>)), <i>a</i>*),</span><em>(3)</em></div>
+    </div>
+    <div class="prose">
+      <p>where <i>Q</i> is the set of user queries used to train the attack, CE(.) is the cross entropy loss, <i>a</i>* is the desired target answer by the attacker</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 700 300" role="img" aria-label="Attack overview. On the left, training queries go to the white-box embedder and VLM, which produce a combined loss; a PGD update changes the poison image, which starts from an arbitrary image and feeds back into the models, for 500 steps within 8/255 per pixel. The image is then injected into the knowledge base on the right, where the retriever returns it as the top-1 page for a test query and the VLM replies I will not reply to you.">
+        <defs>
+          <marker id="ah-craft" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-craft-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="zone" d="M24 10H386V276L372 290H10V24Z"/>
+        <text class="t-mono t-muted" x="24" y="32">MALICIOUS IMAGE CREATION</text>
+        <text class="t-sm t-muted mid" x="110" y="62">training queries (80%)</text>
+        <path class="ln" d="M110 70 V106" marker-end="url(#ah-craft)"/>
+        <path class="box" d="M36 110H196V148L184 160H24V122Z"/>
+        <text class="t-mono t-muted mid" x="110" y="130">TARGET MODELS</text>
+        <text class="t-b mid" x="110" y="150">embedder E + VLM G</text>
+        <path class="ln" d="M110 160 V206" marker-end="url(#ah-craft)"/>
+        <text class="t-sm t-muted" x="118" y="188">S(q, I′), CE</text>
+        <path class="box" d="M36 210H196V254L184 266H24V222Z"/>
+        <text class="t-mono t-muted mid" x="110" y="232">LOSS L_RAG</text>
+        <text class="t-code mid" x="110" y="254">2 L_R + 1 L_G</text>
+        <path class="ln-red" d="M196 238 H232" marker-end="url(#ah-craft-red)"/>
+        <text class="t-sm t-red mid" x="215" y="230">PGD</text>
+        <path class="box-red" d="M248 210H372V254L360 266H236V222Z"/>
+        <text class="t-mono t-red mid" x="304" y="232">POISON IMAGE I′</text>
+        <text class="t-sm mid" x="304" y="252">arbitrary image I</text>
+        <path class="ln" d="M304 210 V135 H200" marker-end="url(#ah-craft)"/>
+        <text class="t-sm t-muted mid" x="252" y="127">current I′</text>
+        <text class="t-sm t-muted mid" x="304" y="284">α = 8/255, 500 steps</text>
+
+        <path class="zone" d="M414 10H690V276L676 290H400V24Z"/>
+        <text class="t-mono t-muted" x="414" y="32">VD-RAG SYSTEM</text>
+        <text class="t-sm t-muted mid" x="473" y="62">test query q (20%)</text>
+        <path class="ln" d="M473 70 V106" marker-end="url(#ah-craft)"/>
+        <path class="box" d="M430 110H528V148L516 160H418V122Z"/>
+        <text class="t-mono t-muted mid" x="473" y="130">RETRIEVER</text>
+        <text class="t-sm t-ink2 mid" x="473" y="150">top-1 by S</text>
+        <path class="box" d="M430 210H528V254L516 266H418V222Z"/>
+        <text class="t-mono t-muted mid" x="473" y="232">KB</text>
+        <text class="t-sm t-ink2 mid" x="473" y="252">pages + I′</text>
+        <path class="ln" d="M473 210 V164" marker-end="url(#ah-craft)"/>
+        <text class="t-sm t-muted" x="481" y="190">page embeddings</text>
+        <path class="ln-red" d="M528 135 H564" marker-end="url(#ah-craft-red)"/>
+        <text class="t-sm t-red mid" x="546" y="127">I′</text>
+        <path class="box" d="M580 110H678V148L666 160H568V122Z"/>
+        <text class="t-mono t-muted mid" x="623" y="130">GENERATOR</text>
+        <text class="t-b mid" x="623" y="150">VLM G</text>
+        <path class="ln-red" d="M623 160 V206" marker-end="url(#ah-craft-red)"/>
+        <text class="t-sm t-red" x="631" y="188">a*</text>
+        <path class="box-red" d="M580 210H678V254L666 266H568V222Z"/>
+        <text class="t-sm t-red mid" x="623" y="234">“I will not reply</text>
+        <text class="t-sm t-red mid" x="623" y="252">to you!”</text>
+        <path class="ln-red" d="M372 238 H414" marker-end="url(#ah-craft-red)"/>
+        <text class="t-sm t-red mid" x="393" y="230">inject</text>
+      </svg>
+      </div>
+      <figcaption><b>Overview of our attack.</b> We select an arbitrary document/image <i>I</i> and optimize it against all queries <i>Q</i> in the training set (shown on the left). The resulting poisoned document <i>I′</i> is then injected into the KB. When the attack is successful, <i>I′</i> is retrieved and causes the generator <i>G</i> to malfunction (shown on the right).</figcaption>
+    </figure>
+
+    <h3>Attack Hyper-parameters</h3>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Hyper-parameter</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Starting image</td><td>An arbitrary image that is not relevant to any query</td></tr>
+        <tr><td>Method</td><td>Projected gradient descent (PGD)</td></tr>
+        <tr><td>Gradient steps</td><td>500, linear learning rate schedule from 3×10⁻³ to 3×10⁻⁴</td></tr>
+        <tr><td>Batch size</td><td>8 user queries</td></tr>
+        <tr><td>Loss weights</td><td>λ<sub>R</sub> = 2, λ<sub>G</sub> = 1</td></tr>
+        <tr><td>Maximum image perturbation α</td><td>8/255</td></tr>
+        <tr><td>Similarity <i>S</i>(<i>q</i>, <i>I</i>)</td><td>Cosine similarity between embeddings</td></tr>
+        <tr><td>Target malicious reply <i>a</i>*</td><td><span class="term">I will not reply to you!</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="psec" id="setup">
+    <h2>Experiment Design</h2>
+    <div class="prose">
+      <p>We evaluate our attacks on two visual document retrieval datasets taken from the ViDoRe benchmark versions 1 and 2. We use a mix of embedding models that range in their sizes, recency, and target applications.</p>
+    </div>
+    <div class="table-wrap"><table class="data-table ops-models">
+      <thead><tr><th>Component</th><th>Name</th><th>Details</th></tr></thead>
+      <tbody>
+        <tr><td>Dataset</td><td>ViDoRe-V1-AI</td><td>100 queries and 1000 images (with exactly one relevant ground-truth image in the KB per query)</td></tr>
+        <tr><td>Dataset</td><td>ViDoRe-V2-ESG</td><td>52 queries and 1538 images with an average of 2.5 relevant images per query</td></tr>
+        <tr><td>Embedder</td><td>CLIP-ViT-LARGE (CLIP-L)</td><td>0.4B; seminal multimodal model trained using contrastive learning to achieve zero-shot image classification</td></tr>
+        <tr><td>Embedder</td><td>Jina-CLIP-v2 (Jina-CLIP)</td><td>0.9B; recent extension of CLIP trained with additional multilingual text-image and text-text contrastive losses to bridge the modality gap problem exhibited by CLIP</td></tr>
+        <tr><td>Embedder</td><td>ColPali-v1.3 (ColPali)</td><td>3B; state-of-the-art in visual document retrieval; ColBERT-style late embedding interaction with the MaxSim retrieval similarity metric</td></tr>
+        <tr><td>VLM</td><td>SmolVLM-Instruct</td><td>2.2B</td></tr>
+        <tr><td>VLM</td><td>Qwen2.5-VL-3B-Instruct</td><td>3.75B</td></tr>
+      </tbody>
+    </table></div>
+    <div class="prose" style="margin-top:20px">
+      <p>We split each dataset into a training set (80%, used to optimize the malicious image) and a test set (20%). For the above models, we assume the retriever only retrieves the top-1 relevant image from the KB.</p>
+    </div>
+
+    <h3>Evaluation Metrics</h3>
+    <div class="prose"><p>We evaluate the RAG system and the attack using the following performance metrics:</p></div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Recall-B</h4><p>Recall-B is the fraction of queries for which <i>R</i> retrieves a relevant image prior to attack.</p></div>
+      <div class="card"><h4>Recall-A</h4><p>Recall-A is the fraction of queries for which <i>R</i> retrieves a relevant image after the attack.</p></div>
+      <div class="card"><h4>ASR-R</h4><p>ASR-R is the fraction of queries for which the malicious image is retrieved by <i>R</i>.</p></div>
+    </div>
+    <div class="cards ops-join" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>ASR-G-Hard</h4><p>ASR-G-Hard is the fraction of queries for which the VLM outputs the target response <i>a</i>* verbatim, assuming that the malicious image is retrieved.</p></div>
+      <div class="card"><h4>ASR-G-Soft</h4><p>ASR-G-Soft is the average embedding similarity between the VLM generated response and the target response <i>a</i>*, assuming that the malicious image is retrieved, computed using the Jina-Embeddings-V3 text embedding model.</p></div>
+    </div>
+  </section>
+
+  <section class="psec" id="results">
+    <h2>Results</h2>
+    <div class="stats">
+      <div class="stat"><b class="red">1.000</b><span>ASR-R with CLIP-L on ViDoRe-V1-AI, for both VLMs</span></div>
+      <div class="stat"><b>0.000</b><span>ASR-R against ColPali-v1.3 on ViDoRe-V1-AI</span></div>
+      <div class="stat"><b>0.818</b><span>lowest ASR-G-Hard across all twelve combinations</span></div>
+      <div class="stat"><b>8/255</b><span>α from which attacks almost perfectly satisfy both conditions</span></div>
+    </div>
+
+    <h3>Effect of Perturbation Intensity</h3>
+    <div class="prose">
+      <p>We observe that attacks can almost perfectly satisfy both the retrieval and the generation conditions starting from α = 8/255. Therefore, in the rest of the paper, we consider only attacks with α = 8/255. Despite the success of the attack, the perturbed image is almost indistinguishable from the original.</p>
+    </div>
+
+    <h3>Comparison of Different Models</h3>
+    <div class="prose">
+      <p>As the previous results indicate, we observe high values of ASR-R, ASR-G-Hard, and ASR-G-Soft for most of the considered models, except ColPali-v1.3 which is almost unaffected by our attack. Increasing the allowed perturbation to α = 128/255 and training over 1500 gradient steps did not produce better results against ColPali-v1.3. Otherwise, CLIP-ViT-LARGE and Jina-CLIP-v2 almost always retrieve our malicious image.</p>
+    </div>
+
+    <figure class="figure chart ops-t1" data-augmented-ui="tl-clip br-clip border">
+      <div class="explorer">
+        <div class="ex-tabs" aria-label="Table 1 metric">
+          {METRICS.map((m, i) => <button class="ex-tab" aria-controls={m.id} aria-selected={i === 0 ? 'true' : 'false'}>{m.name}</button>)}
+        </div>
+        {METRICS.map((m, i) => (
+          <div class="ex-panel" id={m.id} hidden={i !== 0} data-augmented-ui="tl-clip br-clip border">
+            <p class="chart-title">{m.name} for each dataset, embedder and VLM</p>
+            <p class="chart-sub">{m.sub}</p>
+            <div class="hb" role="list" style="--max:1; --label-w:6.5rem">
+              {T1.map((r, j) => (
+                <Fragment>
+                  {j % 2 === 0 && <div class="hb-group">{r[0]}, {r[1]}</div>}
+                  <div class="hb-row" role="listitem" data-tip={tip(r)} aria-label={`${r[0]}, ${r[1]} with ${r[2]}: ${m.name} ${f3(r[m.col])}`}><span class="hb-label">{r[2]}</span><span class="hb-track" aria-hidden="true"><span class={`hb-seg ${m.bar}`} style={`--v:${r[m.col]}`}></span></span><span class={r[m.col] === 1 ? 'hb-val hi' : 'hb-val'}>{f3(r[m.col])}</span></div>
+                </Fragment>
+              ))}
+            </div>
+            <div class="hb-axis" aria-hidden="true" style="--label-w:6.5rem">
+              <span class="sp"></span>
+              <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">0.25</span><span style="left:50%">0.5</span><span style="left:75%">0.75</span><span style="left:100%">1</span></div>
+              <span class="sp"></span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div class="chart-foot">
+        <span>α = 8/255, top-1 retrieval.</span>
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Dataset</th><th>Embedder</th><th>VLM</th><th class="n">Recall-B</th><th class="n">Recall-A</th><th class="n">ASR-R</th><th class="n">ASR-G-Hard</th><th class="n">ASR-G-Soft</th></tr></thead>
+            <tbody>
+              {T1.map((r) => <tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td>{r.slice(3).map((v) => <td class="n">{f3(v as number)}</td>)}</tr>)}
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+      <figcaption><b>Comparison of the attack impact on different embedding models and VLMs with regards to generation.</b> The attack shows high values for ASR-G-Hard and ASR-G-Soft across all combinations and high ASR-R against Jina-CLIP-v2 and CLIP-ViT-LARGE, while ColPali-v1.3 exhibits good adversarial robustness.</figcaption>
+    </figure>
+
+    <div class="prose" style="margin-top:24px">
+      <p>Regarding generation, our attack consistently causes SmolVLM-Instruct and Qwen2.5-VL-3B-Instruct to generate the target answer verbatim for almost all user queries in the test dataset. We also observe an interesting interaction where Jina-CLIP-v2 seems to somewhat inhibit the learning of effective attacks against generation. In general, the results show that our attacks are successful against a broad range of models.</p>
+    </div>
+    <blockquote class="excerpt"><p>The image and textual embeddings produced by CLIP-ViT-LARGE andJina-CLIP-v2 are easily separable (and thus easier to attack), while those computed by ColPali-v1.3 are harder to separate.</p></blockquote>
+
+    <h3>Attack Transferability</h3>
+    <div class="prose">
+      <p>While the above evaluations assumed white-box access to the attacker, we also evaluated our attacks in the black-box setting, where the adversary does not have access to the embedding model and VLM used in the RAG system. We did not observe any transferability of the attack across the different embedding and VLM models. Attacks trained against a certain combination (embedding model, VLM) only work against the same combination. Therefore, exploring attacks that are trained simultaneously against multiple models is a direction for future research.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="limitations">
+    <h2>Limitations</h2>
+    <div class="prose">
+      <ul>
+        <li>We do not consider defenses to our proposed attack; however, we plan to evaluate our attack against a variety of defenses including re-rankers, multimodal LLM-as-a-Judge, and poisoned sample detectors in future work. Additionally, we aim to examine whether adaptive attacks could be crafted against specific defenses.</li>
+        <li>Our attacks can be detected by filtering images that are retrieved too frequently; however, our attack uncovers a fundamental weakness of M-RAG pipelines that could be useful for hardening through adversarial training.</li>
+        <li>Our evaluation is not comprehensive, as we do not consider a large number of embedding models, VLMs, datasets, metrics, and transferability evaluations. In future work, we aim to provide an extensive evaluation of the attack showing the generalization of the results observed in this paper.</li>
+      </ul>
+    </div>
+    <p class="footnote">Transactions on Machine Learning Research, 2026: <a href="/papers/onepic/">One Pic is All it Takes: Poisoning Visual Document Retrieval Augmented Generation with a Single Image</a></p>
+  </section>
+
+  <section class="psec" id="conclusion">
+    <h2>Conclusion</h2>
+    <div class="prose">
+      <p>In this paper, we demonstrated the first poisoning attack against VD-RAG systems. Our attack showcased that conventional embedding models and VLMs are vulnerable to adversarial perturbation, where a single injected image is capable of causing a DoS of the entire RAG pipeline (both retrieval and generation). We also observed notable adversarial robustness of the ColPali-v1.3 embedding model and provided hints into why this is the case. Nevertheless, our attack provides the first step towards understanding the vulnerability of multimodal RAG systems and enhancing their robustness for future adoption.</p>
+    </div>
+    <ul class="takeaways">
+      <li><span>We propose the first poisoning attack against VD-RAG systems.</span></li>
+      <li><span>We demonstrate that our multi-objective optimization approach allows an adversary to craft a single image that causes DoS against the entire RAG pipeline.</span></li>
+      <li><span>We investigate several factors of attack success, such as the embedding model employed, the LMM, and the stealthiness of the injected image.</span></li>
+    </ul>
+  </section>
+</Paper>
+
+<style is:global>
+  .paper-body .prose sup, .paper-body .prose sub, .card sub, .footnote sub { line-height: 0; }
+  .ops-join { margin-top: -29px; }
+  .ops-eq { margin: 8px 0 24px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--smoke); overflow-x: auto; }
+  .ops-eq > div { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 6px 0; font-family: var(--f-text); font-size: 16px; color: var(--bone); white-space: nowrap; }
+  .ops-eq em { font-style: normal; font-family: var(--f-term); font-size: 12px; color: var(--ash); }
+  .ops-eq sub, .ops-eq sup { font-size: 0.72em; }
+  .ops-sum { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1.05; margin: 0 2px; }
+  .ops-sum > span { font-size: 1.35em; }
+  .ops-sum small { font-size: 0.68em; }
+  @media (min-width: 641px) { .ops-models td:nth-child(2) { white-space: nowrap; } }
+  .ops-t1 .explorer { margin: 0; }
+  .ops-t1 .ex-panel { padding: 8px 0 0; background: none; border: 0; }
+  .ops-t1 .chart-title { margin: 0; }
+  .ops-t1 .chart-sub { margin: 4px 0 6px; }
+  .ops-t1 .chart-table { min-width: 0; max-width: 100%; }
+  .ops-t1 .data-table { font-size: 13.5px; }
+  .ops-t1 .data-table th, .ops-t1 .data-table td { white-space: nowrap; padding-right: 10px; }
+</style>

@@ -1,0 +1,646 @@
+---
+import Paper from '../../layouts/Paper.astro';
+const sections = [
+  { id: 'problem', label: 'Introduction' },
+  { id: 'graphql', label: 'GraphQL' },
+  { id: 'attack', label: 'DoS vulnerabilities' },
+  { id: 'approach', label: 'WENDIGO' },
+  { id: 'settings', label: 'Experimental settings' },
+  { id: 'results', label: 'Results' },
+  { id: 'discussion', label: 'Discussion' },
+  { id: 'takeaways', label: 'Conclusion' },
+];
+---
+<Paper id="wendigo" affils={['King’s College London', 'The Alan Turing Institute', 'University of Catania']} sections={sections}>
+  <Fragment slot="abstract">
+    <p>GraphQL is a type of web API which enables a unified endpoint for an application’s resources through its own query language, and is widely adopted by companies such as Meta, GitHub, X, and PayPal. The query-based structure of GraphQL is designed to reduce the over-/under-fetching typical of REST web APIs. Consequently, GraphQL allows attackers to perform Denial-of-Service (DoS) attacks through queries inducing higher server loads with fewer requests. However, with the additional complexity introduced by GraphQL, ensuring applications are not vulnerable to DoS is not trivial.</p>
+    <p>We propose WENDIGO, a black-box Deep Reinforcement Learning (DRL) approach only requiring the GraphQL schema to discover DoS exploitable queries against target applications. For example, our approach is able to discover queries which can perform a DoS attack utilizing only two GraphQL requests per hour, as opposed to the high volume of traffic required by traditional DoS attacks. WENDIGO achieves this by building increasingly more complex queries while maximizing response time by using GraphQL features to increase the server load. The effective query discovery offered by WENDIGO, not only enables developers to test for potential DoS risk in their GraphQL applications but also showcases DRL’s value in security problems such as this one.</p>
+  </Fragment>
+
+  <section class="psec" id="problem">
+    <h2>Introduction</h2>
+    <div class="prose">
+      <p>GraphQL is an enticing alternative to REST APIs as it provides a unified graph abstraction to an application’s web resources. GraphQL shows a widespread adoption across industry with institutions such as Meta, GitHub, X, and PayPal adopting this API, alongside the 33.4% of surveyed API developers who planned to utilize GraphQL in 2020. All the while, DoS attacks are a recurrent issue across multiple domains. The traditional paradigm for DoS attacks involves flooding the target system with high volumes of traffic and protocol exploitation to overwhelm its resources. However, as a result of the powerful nature of GraphQL, complex operations can replace high traffic volumes, making DoS a serious threat to GraphQL applications.</p>
+      <p>An empirical study exemplifies this stating that most commercial and large open-source GraphQL APIs may be susceptible to DoS. The aforementioned study’s claims are further supported by a 2022 survey stating that of the respondents only 21.7% use timeouts, 23.1% use rate limiting, 26.7% use depth limiting, and 17.5% use cost analysis. With this potential risk in GraphQL, it becomes crucial that developers evaluate whether maliciously crafted queries can cause DoS. To perform this evaluation, as a result of the complex and expansive nature of the potential query space, an automated approach is necessary to search for malicious queries.</p>
+      <p>To aid in this security testing problem, we propose WENDIGO: a black-box DRL agent-based approach to discover GraphQL queries which can be leveraged to perform a DoS attack.</p>
+      <p>To the best of our knowledge, we are the first to utilize DRL to discover DoS queries in the GraphQL domain. Evolutionary algorithms have been used for white-box fuzzing of GraphQL applications, focusing on search-based testing and not the discovery of DoS queries. Although they may be effective at finding bugs, we demonstrate that they are insufficient at discovering the GraphQL specific DoS risk in an application. Other research discusses the risk of DoS for GraphQL applications by utilizing specific handcrafted queries. However, our approach eliminates the need to handcraft samples for applications.</p>
+      <p>Machine learning (ML) based approaches have also been used to great success in other security testing tasks, with DRL specifically being used to search for adversarial inputs in other domains such as SQL injection and cross-site scripting. Although these approaches cannot be directly applied as a result of the differences in domains, their past successes motivate our use of DRL for the task of DoS query discovery in GraphQL.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="graphql">
+    <h2>GraphQL</h2>
+    <div class="prose">
+      <p><span class="term">GraphQL</span> is a query language for APIs which provides flexibility in retrieving data through a single-request declarative approach, thereby addressing both under-fetching and over-fetching problems in REST APIs. For example, consider the scenario in which a client requires a user’s e-mail and the content of their posts.</p>
+    </div>
+
+    <div class="compare" data-augmented-ui="tl-clip br-clip border">
+      <div>
+        <h4>REST API</h4>
+        <ul>
+          <li>In REST, this would require a request to access the path <code>{'users/{id}'}</code>, retrieving all information regarding the user, resulting in over-fetching.</li>
+          <li>However, only the first request is insufficient to retrieve the user’s posts, thereby causing under-fetching.</li>
+          <li>Therefore, a second access to the path <code>{'users/{id}/posts'}</code> is required to retrieve the content of the posts.</li>
+        </ul>
+      </div>
+      <div class="pick">
+        <h4>GraphQL API</h4>
+        <ul>
+          <li>In contrast, GraphQL requires a single request, called a query, to retrieve the precise data needed. An example of such a query would be:</li>
+        </ul>
+        <pre class="gql" data-augmented-ui="tl-clip br-clip border">{`query {
+  users (id:{id}) {
+    email
+    posts{
+      content
+    }
+  }
+}`}</pre>
+      </div>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 680 250" role="img" aria-label="REST answers a request for a user's email and posts in two round trips, while GraphQL answers it in one.">
+        <defs>
+          <marker id="ah-rest" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z" /></marker>
+        </defs>
+        <text class="t-lg mid" x="175" y="40">REST API</text>
+        <text class="t-lg mid" x="515" y="40">GraphQL API</text>
+
+        <path class="box" d="M50 60H114V200L104 210H40V70Z"/>
+        <text class="t-mono t-muted mid" x="77" y="82">CLIENT</text>
+        <path class="box" d="M246 60H310V200L300 210H236V70Z"/>
+        <text class="t-mono t-muted mid" x="273" y="82">SERVER</text>
+        <path class="ln" d="M114 108 H236" marker-end="url(#ah-rest)" />
+        <text class="t-sm mid" x="175" y="100">{'users/{id}'}</text>
+        <path class="ln" d="M236 134 H114" marker-end="url(#ah-rest)" />
+        <text class="t-sm t-muted mid" x="175" y="126">all user data</text>
+        <path class="ln" d="M114 166 H236" marker-end="url(#ah-rest)" />
+        <text class="t-sm mid" x="175" y="158">{'users/{id}/posts'}</text>
+        <path class="ln" d="M236 192 H114" marker-end="url(#ah-rest)" />
+        <text class="t-sm t-muted mid" x="175" y="184">post text</text>
+        <text class="t-sm t-muted mid" x="175" y="230">2 round trips</text>
+
+        <path class="box" d="M390 60H454V200L444 210H380V70Z"/>
+        <text class="t-mono t-muted mid" x="417" y="82">CLIENT</text>
+        <path class="box" d="M586 60H650V200L640 210H576V70Z"/>
+        <text class="t-mono t-muted mid" x="613" y="82">SERVER</text>
+        <path class="ln-red" d="M454 120 H576" marker-end="url(#ah-rest)" />
+        <text class="t-sm t-red mid" x="515" y="112">one query</text>
+        <path class="ln" d="M576 150 H454" marker-end="url(#ah-rest)" />
+        <text class="t-sm t-muted mid" x="515" y="142">email + post text</text>
+        <text class="t-sm t-muted mid" x="515" y="230">1 round trip</text>
+      </svg>
+      </div>
+      <figcaption><b>Figure 1.</b> The query-based structure of GraphQL is designed to reduce the over-/under-fetching typical of REST web APIs.</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>In a query, <span class="term">objects</span> represent entities, such as users or posts, that consist of <span class="term">fields</span>. Fields within an object are the individual pieces of data or references to objects. In addition, <span class="term">arguments</span> pass on information for the resolution of a specific field, and <span class="term">aliases</span> allow renaming fields in a query for clarity or to prevent naming conflicts. This structure is defined in the <span class="term">schema</span>.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="attack">
+    <h2>DoS Vulnerabilities in GraphQL</h2>
+    <div class="prose">
+      <p>When the aforementioned concepts of GraphQL are used improperly, they can introduce unique attack vectors for DoS. We utilize the DoS attack vectors derived from standard GraphQL features as the set of capabilities used to derive the state and action spaces of our approach.</p>
+    </div>
+
+    <div class="explorer">
+      <div class="ex-tabs" aria-label="GraphQL DoS attack vectors">
+        <button class="ex-tab" aria-controls="av-circular" aria-selected="true">Circular objects</button>
+        <button class="ex-tab" aria-controls="av-dup">Field duplication</button>
+        <button class="ex-tab" aria-controls="av-alias">Alias overloading</button>
+        <button class="ex-tab" aria-controls="av-limit">Limit overriding</button>
+        <button class="ex-tab" aria-controls="av-batch">Query batching</button>
+      </div>
+      <div>
+        <div class="ex-panel" id="av-circular" data-augmented-ui="tl-clip br-clip border"><h4>Circular objects</h4>
+          <p>Circular Objects are a result of a circular relationship in object references resulting in a potentially infinite amount of recursion in the query request. Querying circular objects increases server load by forcing the server to recursively retrieve objects to fulfill the request.</p>
+          <dl><dt>In WENDIGO</dt><dd>Additionally, objects have values for object limit overriding arguments, with circular objects being implicitly included by the recursive construction of the state space.</dd></dl></div>
+        <div class="ex-panel" id="av-dup" hidden data-augmented-ui="tl-clip br-clip border"><h4>Field duplication</h4>
+          <p>Field Duplication is when fields in a query are repeated so that when the server resolves the query it has to repeatedly resolve the same field thereby increasing server load.</p>
+          <dl><dt>In WENDIGO</dt><dd>In the state space, each valid field/object location has values for field duplication and alias overloading.</dd></dl></div>
+        <div class="ex-panel" id="av-alias" hidden data-augmented-ui="tl-clip br-clip border"><h4>Alias overloading</h4>
+          <p>Alias Overloading is similar to field duplication however it uses aliases to repeat fields under different names and by default there are no limits on the number of aliases.</p>
+          <dl><dt>In WENDIGO</dt><dd>In the state space, each valid field/object location has values for field duplication and alias overloading.</dd></dl></div>
+        <div class="ex-panel" id="av-limit" hidden data-augmented-ui="tl-clip br-clip border"><h4>Object limit overriding</h4>
+          <p>Object Limit Overriding results when servers allow the number of objects returned from a specific query to be specified by an argument, therefore the limit can be increased to increase the load on the server.</p>
+          <dl><dt>In WENDIGO</dt><dd>Additionally, objects have values for object limit overriding arguments, with circular objects being implicitly included by the recursive construction of the state space.</dd></dl></div>
+        <div class="ex-panel" id="av-batch" hidden data-augmented-ui="tl-clip br-clip border"><h4>Array-based query batching</h4>
+          <p>Array-Based Query Batching allows multiple queries to be sent in a single request thereby reducing the volume of requests required to perform a DoS attack.</p>
+          <dl><dt>In WENDIGO</dt><dd>Array-based query batching has its own value to specify the batch size for queries; if not specified, only a single query is sent.</dd></dl></div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>Static and dynamic tools such as InQL, GraphQL Cop and BatchQL test for these vulnerabilities. However, they focus on detecting each attack vector by performing simple checks. Therefore, they do not focus on the discovery of more complex queries utilizing a combination of these vulnerabilities. To the best of our knowledge, we are the first to utilize DRL to discover DoS exploitable GraphQL queries through the combination of vulnerabilities.</p>
+    </div>
+
+    <h3>Denial-of-Service</h3>
+    <div class="prose">
+      <p>Traditionally, DoS attacks and Distributed DoS (DDoS) attacks, utilize high volumes of traffic to flood networks to impact the availability of an application. However, DoS attacks do not require high traffic volumes, <span class="term">Low-rate DoS</span> (LDoS) attacks such as shrew account for only 10-20% of normal traffic. LDoS attacks achieve DoS through the use of periodic pulses instead of a high volume of traffic while maintaining good attack performance compared to DoS or DDoS. In the case of DoS in GraphQL, we extend the intuition behind the aforementioned LDoS attack however instead of traffic pulses we periodically use complex queries crafted from the aforementioned attack vectors.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="approach">
+    <h2>WENDIGO</h2>
+    <div class="prose">
+      <p><span class="term">Deep Reinforcement Learning</span> (DRL) is a type of ML in which an agent learns through interacting with an environment. The three key components of a DRL problem are the: states, actions, and rewards. From a state, the agent decides on an action that results in a reward and a new state.</p>
+      <p>WENDIGO consists of two key components: the environment and the agent. The environment converts the GraphQL schema into the state and action spaces. The state space is a recursive expansion of the schema using GraphQL features which increase server load, thereby creating a representation of a bounded subset of the potential query space, therefore the states are representations of potential DoS queries. The action space mirrors that of the state space however it contains add and remove actions for each component of the state space. The agent chooses an action to modify the current query and receives the response time of that modified query as a reward. Through these components, WENDIGO not only discovers queries which induce large response times, but it is also able to build on these queries further maximizing their resource usage.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 680 476" role="img" aria-label="Flowchart of query discovery. In the agent, the state feeds the neural network, which picks an action. The action updates the environment's state. A new state goes back to the agent and becomes a query sent to the Docker target; its response is either rejected or gives a response time. A repeated state is skipped. All three paths lead to the reward, which returns to the agent.">
+        <defs>
+          <marker id="ah-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z" /></marker>
+          <marker id="ah-flow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z" /></marker>
+        </defs>
+
+        <path class="box-dash" d="M30 24H212V220L198 234H16V38Z"/>
+        <text class="t-mono t-muted mid" x="114" y="46">AGENT</text>
+        <path class="box-red" d="M43 64H194V87L185 96H34V73Z"/>
+        <text class="t-sm t-red mid" x="114" y="84">Action</text>
+        <path class="box-solid" d="M43 122H194V145L185 154H34V131Z"/>
+        <text class="t-sm t-on-red mid" x="114" y="142">Neural Network (PPO)</text>
+        <path class="box-plain" d="M43 180H194V203L185 212H34V189Z"/>
+        <text class="t-sm mid" x="114" y="200">State</text>
+        <path class="ln" d="M114 180 V156" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M114 122 V98" marker-end="url(#ah-flow)" />
+
+        <path class="box-dash" d="M258 24H664V450L650 464H244V38Z"/>
+        <text class="t-mono t-muted mid" x="454" y="46">ENVIRONMENT</text>
+        <path class="box-plain" d="M398 64H539V87L530 96H389V73Z"/>
+        <text class="t-sm mid" x="464" y="84">State</text>
+        <path class="box-plain" d="M298 122H439V145L430 154H289V131Z"/>
+        <text class="t-sm mid" x="364" y="142">New State</text>
+        <path class="box-plain" d="M498 122H639V145L630 154H489V131Z"/>
+        <text class="t-sm mid" x="564" y="142">Repeat State</text>
+        <path class="box-plain" d="M298 180H439V203L430 212H289V189Z"/>
+        <text class="t-sm mid" x="364" y="200">Query</text>
+        <path class="box-plain" d="M498 180H639V203L630 212H489V189Z"/>
+        <text class="t-sm mid" x="564" y="200">Skipped</text>
+        <path class="box" d="M298 238H439V261L430 270H289V247Z"/>
+        <text class="t-sm mid" x="364" y="258">Docker Target</text>
+        <path class="box-plain" d="M298 296H439V319L430 328H289V305Z"/>
+        <text class="t-sm mid" x="364" y="316">Response</text>
+        <path class="box-plain" d="M298 354H439V377L430 386H289V363Z"/>
+        <text class="t-sm mid" x="364" y="374">Is Rejected</text>
+        <path class="box-plain" d="M498 354H639V377L630 386H489V363Z"/>
+        <text class="t-sm mid" x="564" y="374">Response Time</text>
+        <path class="box-red" d="M398 412H539V435L530 444H389V421Z"/>
+        <text class="t-sm t-red mid" x="464" y="432">Reward</text>
+
+        <path class="ln-red" d="M194 80 H387" marker-end="url(#ah-flow-red)" />
+        <path class="ln" d="M464 96 V109 H364 V120" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M464 109 H564 V120" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M364 154 V178" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M564 154 V178" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M364 212 V236" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M364 270 V294" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M364 328 V352" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M439 312 H564 V352" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M364 386 V399 H440 V410" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M564 386 V399 H488 V410" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M639 196 H652 V454 H464 V446" marker-end="url(#ah-flow)" />
+        <path class="ln" d="M289 138 H228 V196 H196" marker-end="url(#ah-flow)" />
+        <path class="ln-red" d="M389 428 H114 V214" marker-end="url(#ah-flow-red)" />
+      </svg>
+      </div>
+      <figcaption><b>Figure 2.</b> Flowchart of WENDIGO query discovery. We design the current state to be a representation of the current query, therefore the state transitions imposed by actions reflect query modifications.</figcaption>
+    </figure>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip">
+      <p>WENDIGO gets its name from the Algonquian legend about a malevolent spirit whose hunger and size grows the more it consumes which is analogous to how our approach grows queries the more server resources are consumed.</p>
+    </div>
+
+    <h3>Black-Box</h3>
+    <div class="prose">
+      <p>The motivation behind the design of a black-box approach is that it makes a more realistic threat model, utilizing only the URL and schema which would be available to a realistic adversary as the schema is often publicly available or can be reconstructed. Furthermore, black-box approaches can make security testing accessible to product developers who otherwise lack deep security expertise.</p>
+    </div>
+
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>No internal information</h4><p>WENDIGO does not utilize any internal information from, or code of, the target application and only relies on the response time and queries generated.</p></div>
+      <div class="card"><h4>Docker containers</h4><p>Our experiments and released code utilize Docker containers instead of a URL to ensure evaluations are conducted safely in a controlled environment.</p></div>
+    </div>
+
+    <h3>Environment</h3>
+    <div class="prose">
+      <p>The environment was designed following the specifications of Gymnasium, a standardized agent-environment communication API, allowing compatibility between different agents and environments. The state, action, and rewards of the environment are defined as follows.</p>
+    </div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>State</h4><p>To represent the GraphQL query space as the state space, we use the settings of <code>max_depth</code> and <code>max_height</code> to bound the state space. <code>max_depth</code> represents the maximum recursion when constructing the state space from the query space, and <code>max_height</code> represents the maximum of a single value in the state space.</p></div>
+      <div class="card"><h4>Actions</h4><p>The action space mirrors that of the state space, however, it has an add, and a remove action for each value in the state space. The <code>multiplier</code> setting is the quantity by which a value is increased or decreased when a action is performed. If a performed action is invalid in the current state then no modification occurs and the query is skipped.</p></div>
+      <div class="card"><h4>Rewards</h4><p>The reward for a state-action pair is the response time of the application in seconds. This implicitly handles rejected queries as a result of their marginal response times. If the state-action pair does not produce a new query then the query is skipped and a response time of zero seconds is returned.</p></div>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 610 250" role="img" aria-label="The paper's example: state [1, 2, 1, 2] maps to users-DUP, users_email-DUP, users_posts-DUP and users_posts_content-ALIAS, giving a query in which users holds two email fields and posts, and posts holds content twice under the aliases C1 and C2.">
+        <defs>
+          <marker id="ah-map" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z" /></marker>
+        </defs>
+        <text class="t-mono t-muted" x="24" y="30">STATE</text>
+        <text class="t-mono t-muted" x="80" y="30">STATE-TO-QUERY MAPPING</text>
+        <text class="t-mono t-muted" x="322" y="30">QUERY</text>
+
+        <path class="box-plain" d="M31 79H64V98L57 105H24V86Z"/>
+        <text class="t-code mid" x="44" y="96">1</text>
+        <path class="box-red" d="M31 118H64V137L57 144H24V125Z"/>
+        <text class="t-code t-red mid" x="44" y="135">2</text>
+        <path class="box-plain" d="M31 157H64V176L57 183H24V164Z"/>
+        <text class="t-code mid" x="44" y="174">1</text>
+        <path class="box-red" d="M31 196H64V215L57 222H24V203Z"/>
+        <text class="t-code t-red mid" x="44" y="213">2</text>
+
+        <text class="t-code" x="80" y="96">users-DUP</text>
+        <text class="t-code" x="80" y="135">users_email-DUP</text>
+        <text class="t-code" x="80" y="174">users_posts-DUP</text>
+        <text class="t-code" x="80" y="213">users_posts_content-ALIAS</text>
+
+        <path class="ln" d="M284 92 H332" marker-end="url(#ah-map)" />
+        <path class="ln" d="M284 131 H300 L348 118" marker-end="url(#ah-map)" />
+        <path class="ln" d="M300 131 L348 144" marker-end="url(#ah-map)" />
+        <path class="ln" d="M284 170 H348" marker-end="url(#ah-map)" />
+        <path class="ln" d="M284 209 H300 L364 196" marker-end="url(#ah-map)" />
+        <path class="ln" d="M300 209 L364 222" marker-end="url(#ah-map)" />
+
+        <text class="t-code" x="322" y="62">{'query {'}</text>
+        <text class="t-code" x="338" y="96">{'users {'}</text>
+        <text class="t-code" x="354" y="122">email</text>
+        <text class="t-code" x="354" y="148">email</text>
+        <text class="t-code" x="354" y="174">{'posts {'}</text>
+        <text class="t-code" x="370" y="200">C1:content</text>
+        <text class="t-code" x="370" y="226">C2:content</text>
+
+        <text class="t-sm t-b" x="478" y="96">Depth = 1 &amp; Height = 1</text>
+        <path class="ln" d="M468 110 V152" />
+        <text class="t-sm t-b" x="478" y="135">Height = 2</text>
+        <text class="t-sm t-b" x="478" y="174">Depth = 2 &amp; Height = 1</text>
+        <path class="ln" d="M468 188 V230" />
+        <text class="t-sm t-b" x="478" y="213">Height = 2</text>
+      </svg>
+      </div>
+      <figcaption><b>Figure 3.</b> An example of the state to query conversion, pruned to only present values for readability.</figcaption>
+    </figure>
+
+    <h3>Agents</h3>
+    <div class="prose">
+      <p>The DRL algorithm chosen for our approach is <span class="term">Proximal Policy Optimization</span> (PPO), an actor-critic method, utilizing the original settings and implementation of the algorithm from cleanrl. PPO was chosen as it shows superior performance and training time when compared other algorithms.</p>
+      <p>We design two random search-based techniques in our environment to show the value of an agent-based approach. First, <strong>Random</strong> uses random action selection and secondly, <strong>Random-Greedy</strong> uses a random action selection which only updates the current state if the new response time is greater than the state’s response time. We utilize random search for these approaches following the lead of EvoMaster’s black-box setting.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="settings">
+    <h2>Experimental Settings</h2>
+    <div class="prose">
+      <p><strong>Target.</strong> For evaluation safety we use a docker container of the target application. We utilize Damn Vulnerable GraphQL Application (DVGA), as a proof of concept to show the potential of our approach on a vulnerable application. We do not evaluate WENDIGO on real applications in this initial work because we want to ensure the evaluation is conducted safely in cooperation with the developers.</p>
+      <p><strong>Baselines.</strong> The motivation behind our selection of a baseline from existing approaches is twofold. Firstly, to the best of our knowledge, there are no other approaches designed to discover DoS queries in the GraphQL domain, barring simple test suites which evaluate only the presence of specific attack vectors. Secondly, without alternatives, developers would have to rely on state-of-the-art fuzzers. Therefore utilizing a fuzzer as a baseline evaluates if a GraphQL fuzzer is sufficient to effectively search for DoS queries in an application. For the aforementioned reasons we have decided to utilize EvoMaster, a state-of-the-art GraphQL fuzzer, as our main baseline.</p>
+      <p>EvoMaster was initially crafted as an evolutionary white-box testing tool tailored for RESTful APIs, relying on their schema provided in the OpenAPI specification format. Recent developments have extended its capabilities to encompass testing for GraphQL APIs. In real-world scenarios, accessing the code for white-box testing may not always be feasible. Fortunately, EvoMaster realises a black-box approach that employs a Random Search on syntactically valid queries to explore the input space.</p>
+      <p>Additionally, we also utilize Random and Random-Greedy in our environment as additional baselines. For all evaluations the two random agents use the same random seed value therefore the only difference is the aforementioned state transition criteria.</p>
+    </div>
+
+    <h3>Settings</h3>
+    <div class="prose">
+      <p>We consider two settings for evaluating query discovery: UNPROTECTED and PROTECTED.</p>
+    </div>
+    <div class="compare" data-augmented-ui="tl-clip br-clip border">
+      <div>
+        <h4>UNPROTECTED</h4>
+        <ul>
+          <li>The UNPROTECTED setting for query discovery evaluates an application with no mitigations in place to protect against DoS.</li>
+          <li>Although we are not enforcing protections through the use of constraints in this case, for practical reasons the trained and random agents’ state and action spaces require bounds.</li>
+          <li>Therefore, we utilize the settings <code>max_depth = 10</code>, and <code>max_height = 100</code>.</li>
+          <li>We utilize <code>multiplier = 10</code> to speed up the query discovery since we have a large bound on <code>max_height</code>.</li>
+          <li>Additionally, we set EvoMaster’s <code>max_depth = 10</code>.</li>
+          <li>For the UNPROTECTED setting query discovery, we present the first 384 steps (3 PPO updates) as the agent sufficiently exploits the application in this time frame.</li>
+        </ul>
+      </div>
+      <div>
+        <h4>PROTECTED</h4>
+        <ul>
+          <li>The PROTECTED setting for query discovery evaluates an application with depth and field height limiting for DoS mitigations to reduce the max complexity of requested queries.</li>
+          <li>To model this basic protection we utilize the built-in constraints of our environment.</li>
+          <li>Therefore, we set the trained and random agents to <code>max_depth = 5</code>, and <code>max_height = 5</code>.</li>
+          <li>We use a <code>multiplier = 1</code> so that the approaches do not rapidly over-step the constraints.</li>
+          <li>Additionally, we set EvoMaster’s <code>max_depth = 5</code>.</li>
+          <li>For the PROTECTED setting query discovery, we present the first 1,280 steps (10 PPO updates).</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>DoS Attack Design</h3>
+    <div class="prose">
+      <p>We take the highest response time (HRT) queries from both of the aforementioned settings and utilize them to perform a DoS attack on the application. We conduct this attack by sending the query to the application and waiting for the full response before re-sending the query. This results in pulses of activity by the attacker, akin to that described by the LDoS attack. While the attacker is sending its queries we have a benign user sending a basic query in the same fashion. The benign query has an average response time, over 100,000 queries, of 0.00783 seconds when the application is not under attack. We send queries from both the attacker and benign user for an hour (3,600 seconds) and wait until the last query from both agents is received. We then use the number of attacker queries required to successfully perform the DoS to compare the attack efficacy across settings and approaches.</p>
+      <p><strong>Metric 4.1 (%Denial).</strong> To calibrate the DoS attack to ensure a fair comparison, we use the percentage of benign user response time which is a result of the attack. Formally, we define %Denial as follows:</p>
+    </div>
+    <div class="formula" role="math" aria-label="%Denial equals the sum of tau-hat minus tau-bar, over the sum of tau" data-augmented-ui="tl-clip br-clip border">
+      <span class="lhs">%Denial =</span>
+      <span class="frac"><span>Σ (<i class="hat">τ</i> − <i class="ov">τ</i>)</span><span>Σ (<i>τ</i>)</span></span>
+      <span class="eqn">(1)</span>
+    </div>
+    <p class="footnote">Where: <i class="ov">τ</i> is the mean of the pre-attack response times for benign queries; <i>σ</i> is the standard deviation of the pre-attack response times for benign queries; <i>B</i> is the set of the benign user’s response times during the attack, with <i>τ</i> ∈ <i>B</i>; Impacted response times <i class="hat">τ</i> ∈ {'{'}<i>β</i> | <i>β</i> ∈ <i>B</i>, <i>β</i> &gt; (<i class="ov">τ</i> + 2<i>σ</i>){'}'} uses threshold <i class="ov">τ</i> + 2<i>σ</i> to determine the out of distribution response times with 2<i>σ</i> to reduce the threshold’s sensitivity to noise.</p>
+  </section>
+
+  <section class="psec" id="results">
+    <h2>Results</h2>
+    <div class="prose">
+      <p>This section presents the results for our evaluation of WENDIGO on DVGA.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b class="red">1,649.57<small>s</small></b><span>HRT of all queries, produced by PPO (UNPROTECTED)</span></div>
+      <div class="stat"><b>2</b><span>Attack queries for a DoS with a 99.998%Denial (UNPROTECTED)</span></div>
+      <div class="stat"><b>68.85&times;</b><span>Increase in max response time compared to EvoMaster (UNPROTECTED; 7&times; PROTECTED)</span></div>
+    </div>
+
+    <h3>UNPROTECTED Setting</h3>
+    <div class="prose">
+      <p>Random and Random-Greedy have comparable performance under this setting as a result of their shared selection strategy. EvoMaster achieves a maximum response time of 23.96s throughout the evaluation, however, only achieves these response times sporadically.</p>
+      <p>Finally, the PPO agent is able to surpass both the random agents in 114 steps as well as EvoMaster in 144 steps. At 350 steps the agent achieves a response time of 1,649.57s before the application docker is terminated because of memory over-consumption and then the environment and state are restarted to continue evaluation.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Highest response time found, UNPROTECTED setting</p>
+        <p class="chart-sub">HRT of any query discovered, in seconds.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>WENDIGO (PPO)</span><span><i class="sw-b"></i>WENDIGO random</span><span><i class="sw-n"></i>EvoMaster</span></div>
+      <div class="hb" role="list" style="--max:1700; --label-w:9rem">
+        <div class="hb-row" role="listitem" data-tip="WENDIGO (PPO)|Highest response time: 1,649.57 s" aria-label="WENDIGO PPO: 1,649.57 seconds">
+          <span class="hb-label">PPO</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:1649.57"></span></span>
+          <span class="hb-val hi">1,649.57</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="WENDIGO Random|Highest response time: 70.74 s" aria-label="WENDIGO Random: 70.74 seconds">
+          <span class="hb-label">Random</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:70.74"></span></span>
+          <span class="hb-val">70.74</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="WENDIGO Random-Greedy|Highest response time: 65.75 s" aria-label="WENDIGO Random-Greedy: 65.75 seconds">
+          <span class="hb-label">Random-Greedy</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:65.75"></span></span>
+          <span class="hb-val">65.75</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="EvoMaster|Highest response time: 23.96 s" aria-label="EvoMaster: 23.96 seconds">
+          <span class="hb-label">EvoMaster</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:23.96"></span></span>
+          <span class="hb-val">23.96</span>
+        </div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">425</span><span style="left:50%">850</span><span style="left:75%">1275</span><span style="left:100%">1700s</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Method</th><th class="n">Highest response time</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>PPO</td><td class="n">1,649.57 s</td></tr>
+              <tr><td>Random</td><td class="n">70.74 s</td></tr>
+              <tr><td>Random-Greedy</td><td class="n">65.75 s</td></tr>
+              <tr><td>EvoMaster</td><td class="n">23.96 s</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <p>For the UNPROTECTED setting, the query with the HRT of all queries is produced by PPO and induces a response time of 1,649.57s. When we utilize this query to perform the attack, we get an average response time of 1,824.18s over 3,648.36s for the attacker and 456.00s over 3,648.04s for the benign user. The attacker is able to successfully perform a DoS with a 99.998%Denial utilizing only 2 queries, the least amount of attack queries required for this setting.</p>
+    </div>
+
+    <h3>PROTECTED Setting</h3>
+    <div class="prose">
+      <p>Random performs comparable to Random-Greedy for the first 215 steps. However, subsequently drops off in performance as a result of randomly removing valuable components of the query. Random-Greedy stays within the 20.64s to 57.77s range throughout the evaluation as a result of maintaining sub-optimal states as its baseline. After Random’s initial decline, it is able to slowly increase the response time, eventually surpassing Random-Greedy. As a result of Random not being tied to a baseline state, it can explore more freely. EvoMaster achieves a maximum response time of 29.68s throughout the evaluation. However, it finds such response times sporadically and not consistently like our methods.</p>
+      <p>Finally, the PPO agent takes 650 steps to surpass EvoMaster and 681 steps to surpass both of the random agents. PPO continues to increase the response time up to 208s at 1,155 step in which the application docker is terminated because of memory over-consumption and then the environment is restarted to continue evaluation. In comparison, it took the UNPROTECTED PPO agent only 219 steps to achieve a 208s response time, thereby showing the impact of constraints on our agents.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Highest response time found, PROTECTED setting</p>
+        <p class="chart-sub">HRT of any query discovered, in seconds. Note the different scale.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>WENDIGO (PPO)</span><span><i class="sw-b"></i>WENDIGO random</span><span><i class="sw-n"></i>EvoMaster</span></div>
+      <div class="hb" role="list" style="--max:220; --label-w:9rem">
+        <div class="hb-row" role="listitem" data-tip="WENDIGO (PPO)|Highest response time: 208.00 s" aria-label="WENDIGO PPO: 208 seconds">
+          <span class="hb-label">PPO</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:208"></span></span>
+          <span class="hb-val hi">208.00</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="WENDIGO Random|Highest response time: 81.61 s" aria-label="WENDIGO Random: 81.61 seconds">
+          <span class="hb-label">Random</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:81.61"></span></span>
+          <span class="hb-val">81.61</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="WENDIGO Random-Greedy|Highest response time: 57.77 s" aria-label="WENDIGO Random-Greedy: 57.77 seconds">
+          <span class="hb-label">Random-Greedy</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:57.77"></span></span>
+          <span class="hb-val">57.77</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="EvoMaster|Highest response time: 29.68 s" aria-label="EvoMaster: 29.68 seconds">
+          <span class="hb-label">EvoMaster</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:29.68"></span></span>
+          <span class="hb-val">29.68</span>
+        </div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">55</span><span style="left:50%">110</span><span style="left:75%">165</span><span style="left:100%">220s</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Method</th><th class="n">Highest response time</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>PPO</td><td class="n">208.00 s</td></tr>
+              <tr><td>Random</td><td class="n">81.61 s</td></tr>
+              <tr><td>Random-Greedy</td><td class="n">57.77 s</td></tr>
+              <tr><td>EvoMaster</td><td class="n">29.68 s</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <p>For the PROTECTED setting, the query with the HRT of all queries is produced by PPO and induces a response time of 208s. When we utilize this query to perform the attack, we get an average response time of 20.28s over 3,609.65s for the attacker and 5.49s over 3,603.81s for the benign user. The attacker is able to successfully perform a DoS with a 99.852%Denial utilizing 178 queries, the least amount of attack queries required for this setting.</p>
+    </div>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip">
+      <p><strong>Temporal Vulnerabilities.</strong> The reason for the deviation in response time, between the query discovery and DoS attack of PPO with the PROTECTED setting, is a result of the <code>audit</code> field which requests the application’s logs. Therefore, the time to process the <code>audit</code> field is dependent on the size of the application’s logs which grow throughout the execution of the experiment. Although the <code>audit</code> field is less effective initially on a clean application, our agent was able to learn to exploit it through the temporal nature of the discovery. This shows the value of our approach which utilizes no preconceived knowledge about the application besides the schema and learns through interacting with and exploiting an application.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Attack queries required to perform the DoS</p>
+        <p class="chart-sub">Attacker queries over the one-hour attack. Fewer is a stronger attack.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>WENDIGO (PPO)</span><span><i class="sw-b"></i>WENDIGO random</span><span><i class="sw-n"></i>EvoMaster</span></div>
+      <div class="hb" role="list" style="--max:1500; --label-w:9rem">
+        <div class="hb-group">UNPROTECTED</div>
+        <div class="hb-row" role="listitem" data-tip="PPO (UNPROTECTED)|Attack queries: 2|%Denial: 99.998%" aria-label="PPO unprotected: 2 queries">
+          <span class="hb-label">PPO</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:2"></span></span>
+          <span class="hb-val hi">2</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Random (UNPROTECTED)|Attack queries: 52|%Denial: 99.956%" aria-label="Random unprotected: 52 queries">
+          <span class="hb-label">Random</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:52"></span></span>
+          <span class="hb-val">52</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Random-Greedy (UNPROTECTED)|Attack queries: 65|%Denial: 99.962%" aria-label="Random-Greedy unprotected: 65 queries">
+          <span class="hb-label">Random-Greedy</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:65"></span></span>
+          <span class="hb-val">65</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="EvoMaster (UNPROTECTED)|Attack queries: 1,222|%Denial: 99.729%" aria-label="EvoMaster unprotected: 1,222 queries">
+          <span class="hb-label">EvoMaster</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1222"></span></span>
+          <span class="hb-val">1,222</span>
+        </div>
+        <div class="hb-group">PROTECTED</div>
+        <div class="hb-row" role="listitem" data-tip="PPO (PROTECTED)|Attack queries: 178|%Denial: 99.852%" aria-label="PPO protected: 178 queries">
+          <span class="hb-label">PPO</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:178"></span></span>
+          <span class="hb-val hi">178</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Random (PROTECTED)|Attack queries: 594|%Denial: 99.847%" aria-label="Random protected: 594 queries">
+          <span class="hb-label">Random</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:594"></span></span>
+          <span class="hb-val">594</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Random-Greedy (PROTECTED)|Attack queries: 1,169|%Denial: 99.726%" aria-label="Random-Greedy protected: 1,169 queries">
+          <span class="hb-label">Random-Greedy</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-b" style="--v:1169"></span></span>
+          <span class="hb-val">1,169</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="EvoMaster (PROTECTED)|Attack queries: 1,434|%Denial: 99.674%" aria-label="EvoMaster protected: 1,434 queries">
+          <span class="hb-label">EvoMaster</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1434"></span></span>
+          <span class="hb-val">1,434</span>
+        </div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">375</span><span style="left:50%">750</span><span style="left:75%">1125</span><span style="left:100%">1500</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Method</th><th>Setting</th><th class="n">Attack queries</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>PPO</td><td>UNPROTECTED</td><td class="n">2</td></tr>
+              <tr><td>Random</td><td>UNPROTECTED</td><td class="n">52</td></tr>
+              <tr><td>Random-Greedy</td><td>UNPROTECTED</td><td class="n">65</td></tr>
+              <tr><td>EvoMaster</td><td>UNPROTECTED</td><td class="n">1,222</td></tr>
+              <tr class="hl"><td>PPO</td><td>PROTECTED</td><td class="n">178</td></tr>
+              <tr><td>Random</td><td>PROTECTED</td><td class="n">594</td></tr>
+              <tr><td>Random-Greedy</td><td>PROTECTED</td><td class="n">1,169</td></tr>
+              <tr><td>EvoMaster</td><td>PROTECTED</td><td class="n">1,434</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <h3>Table 1</h3>
+    <div class="table-wrap"><table class="data-table t1">
+      <thead>
+        <tr class="grp"><th colspan="2"></th><th colspan="3"><span>Query discovery</span></th><th colspan="2"><span>DoS attack</span></th></tr>
+        <tr><th>Approach</th><th>Setting</th><th class="n">Queries skipped</th><th class="n">Rejected queries</th><th class="n">HRT</th><th class="n">%Denial</th><th class="n">Attack queries</th></tr>
+      </thead>
+      <tbody>
+        <tr class="hl"><td>PPO</td><td>UNPROTECTED</td><td class="n">43.35%</td><td class="n">14.06%</td><td class="n">1,649.57 s</td><td class="n">99.998%</td><td class="n">2</td></tr>
+        <tr class="hl"><td>PPO</td><td>PROTECTED</td><td class="n">36.88%</td><td class="n">1.25%</td><td class="n">208.00 s</td><td class="n">99.852%</td><td class="n">178</td></tr>
+        <tr><td>Random</td><td>UNPROTECTED</td><td class="n">47.92%</td><td class="n">3.91%</td><td class="n">70.74 s</td><td class="n">99.956%</td><td class="n">52</td></tr>
+        <tr><td>Random</td><td>PROTECTED</td><td class="n">38.98%</td><td class="n">1.95%</td><td class="n">81.61 s</td><td class="n">99.847%</td><td class="n">594</td></tr>
+        <tr><td>Random-Greedy</td><td>UNPROTECTED</td><td class="n">48.70%</td><td class="n">0.26%</td><td class="n">65.75 s</td><td class="n">99.962%</td><td class="n">65</td></tr>
+        <tr><td>Random-Greedy</td><td>PROTECTED</td><td class="n">47.03%</td><td class="n">0.39%</td><td class="n">57.77 s</td><td class="n">99.726%</td><td class="n">1,169</td></tr>
+        <tr><td>EvoMaster</td><td>UNPROTECTED</td><td class="n">-</td><td class="n">27.34%</td><td class="n">23.96 s</td><td class="n">99.729%</td><td class="n">1,222</td></tr>
+        <tr><td>EvoMaster</td><td>PROTECTED</td><td class="n">-</td><td class="n">28.59%</td><td class="n">29.68</td><td class="n">99.674%</td><td class="n">1,434</td></tr>
+      </tbody>
+    </table></div>
+    <p class="footnote">Table displaying the percentage of queries skipped, rejected queries, and highest response time (HRT) for discovery as well as denial percentage for attack calibration and the number of queries required to perform the attack. Queries are skipped if an invalid action is chosen and queries are rejected by the application if they are malformed. Note that EvoMaster does not perform query skipping.</p>
+  </section>
+
+  <section class="psec" id="discussion">
+    <h2>Discussion</h2>
+    <div class="prose">
+      <p><strong>Importance of an Agent.</strong> The advantage of utilizing an agent-based approach is evident when comparing across the results. The Random approach suffers from a lack of information resulting from the completely random action selection, thereby discovering good states purely on chance. The Random-Greedy approach is more stable as a result of the state transition criteria maintaining the best state seen so far, however, the approach suffers when the state maintained is sub-optimal. Although both of the random agents perform better than the agent initially, once the agent begins to learn the environment, both random agents are greatly surpassed.</p>
+      <p><strong>Designed for Purpose.</strong> State-of-the-art fuzzers, such as EvoMaster, may be sufficient for finding surface-level DoS queries in GraphQL as can be seen across the results, however, it only scratches the surface. We observe a 68.85x and 7x increase in the max response time for discovery using the UNPROTECTED and PROTECTED settings respectively when compared to EvoMaster. It is essential to take into consideration that EvoMaster was designed for comprehensive coverage of the input space and not to discover DoS queries. Therefore, intrinsically in its structure it lacks the capabilities for array-based query batching, field duplication, and circular object exploitation which are features crucial for DoS query generation in GraphQL. These findings show the importance of having an approach designed for the problem at hand, especially with the high-risk and complex nature of the GraphQL query space.</p>
+      <p><strong>Impact of DoS in GraphQL.</strong> GraphQL’s ability to provide a unified interface for applications, all the while reducing under- and over-fetching, can be very beneficial to benign users and attackers alike. This is exemplified in our DoS Attack results, in which we achieve successful DoS attacks with queries discovered by our approach utilizing only 2 and 178 query requests for the UNPROTECTED and PROTECTED settings respectively. This demonstrates the importance of having an approach able to discover valid queries that pose a DoS threat for the purpose of application testing.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="takeaways">
+    <h2>Conclusion</h2>
+    <div class="prose">
+      <p>As GraphQL becomes increasingly prevalent and the cybersecurity landscape continues to be challenging, it is essential to recognize how DoS attacks affect GraphQL applications. The potential for significant disruption through the misuse of specific GraphQL features, which can lead to powerful attacks with minimal traffic, necessitates thorough testing. Therefore, this paper introduces WENDIGO, a novel agent-based black-box security testing method aimed at discovering DoS vulnerabilities in GraphQL queries.</p>
+    </div>
+    <ul class="takeaways">
+      <li><span><strong>We propose WENDIGO,</strong> an approach to effectively search for queries which could be exploited for DoS attacks in the GraphQL domain. As a part of this approach, we design a gymnasium environment to encapsulate GraphQL applications for DRL.</span></li>
+      <li><span><strong>We show that WENDIGO not only outperforms both of random-search baselines and a state-of-the-art fuzzer, EvoMaster,</strong> but also able to discover queries that can be exploited to cause severe delays.</span></li>
+      <li><span>Our approach is able to discover queries which can perform a DoS attack utilizing <strong>only two GraphQL requests per hour</strong>, as opposed to the high volume of traffic required by traditional DoS attacks.</span></li>
+      <li><span><strong>WENDIGO offers an automated solution</strong> that replaces the need for manually crafted test queries, facilitating developers in actively safeguarding their GraphQL applications against such threats.</span></li>
+      <li><span><strong>We open-source the WENDIGO code</strong> to encourage future research, and accelerate security testing of GraphQL applications: <a href="https://github.com/isneslab/Wendigo">github.com/isneslab/Wendigo</a>.</span></li>
+    </ul>
+
+    <h3>Future work</h3>
+    <div class="prose">
+      <ul>
+        <li>As future work, we first intend to extend the capabilities of our approach by including more pathways for DoS exploitation and investigate the impact that different DRL algorithms and approaches (e.g., hierarchical DRL) have on our query discovery.</li>
+        <li>Subsequently, we plan to test the most common GraphQL defenses utilized in the industry to evaluate their robustness to our approach, and identify if these defenses can be improved.</li>
+        <li>Finally, we would like to collaborate with developers of real-world applications to be able to safely evaluate our approach in the wild, in addition to aiding in the improvement of DoS robustness for the evaluated application through responsible disclosure.</li>
+      </ul>
+    </div>
+  </section>
+</Paper>
+
+<style is:global>
+  .compare pre.gql {
+    margin: 12px 0 0; padding: 12px 14px; overflow-x: auto;
+    font-family: var(--f-term); font-size: 13px; line-height: 1.55;
+    color: var(--bone); background: var(--black); border: 1px solid var(--smoke);
+  }
+  .compare code, .card code, .callout code {
+    font-family: var(--f-term); font-size: 0.86em; color: var(--bone);
+    background: var(--surface-2); padding: 1px 5px; white-space: nowrap;
+  }
+  .callout code { background: var(--black); }
+  .formula {
+    display: flex; align-items: center; gap: 14px;
+    margin: 4px 0 18px; padding: 14px 16px; overflow-x: auto;
+    color: var(--bone); background: var(--surface); border: 1px solid var(--smoke);
+  }
+  .formula { font-family: var(--f-text); font-size: 20px; }
+  .formula .lhs { margin-left: auto; }
+  .formula .eqn { margin-left: auto; font-family: var(--f-term); font-size: 13px; color: var(--ash); }
+  .formula .frac { display: inline-flex; flex-direction: column; align-items: center; }
+  .formula .frac > span { padding: 3px 10px; }
+  .formula .frac > span + span { border-top: 1px solid var(--bone); }
+  .ov { text-decoration: overline; text-decoration-thickness: 1px; }
+  .hat { position: relative; display: inline-block; }
+  .hat::after { content: '^'; position: absolute; left: 50%; top: 0.02em; transform: translateX(-50%); font-style: normal; font-size: 0.85em; line-height: 1; }
+  .footnote i { color: var(--bone); }
+  #results .stat b { font-size: clamp(28px, 2.4vw, 34px); white-space: nowrap; }
+  #results .stat b small { font-size: 0.55em; margin-left: 2px; }
+  .psec .figure.chart { margin: 32px 0; }
+  .t1 tr.grp th { padding-bottom: 0; border-bottom: 0; text-align: center; }
+  .t1 tr.grp th span { display: block; padding-bottom: 6px; border-bottom: 1px solid var(--smoke-2); }
+  .t1 td:first-child { white-space: nowrap; }
+  .t1 thead th { vertical-align: bottom; }
+  .t1 th.n { white-space: normal; }
+  #attack .ex-tab { flex: 1 1 auto; justify-content: center; }
+  .takeaways a { color: var(--bone); }
+  .takeaways a:hover { color: var(--red); }
+</style>

@@ -1,0 +1,840 @@
+---
+import Paper from '../../layouts/Paper.astro';
+const sections = [
+  { id: 'introduction', label: 'Introduction' },
+  { id: 'foundations', label: 'Foundational concepts' },
+  { id: 'stages', label: 'Four stages' },
+  { id: 'review', label: 'Review methodology' },
+  { id: 'prevalence', label: 'Prevalence' },
+  { id: 'pitfalls', label: 'Pitfall taxonomy' },
+  { id: 'cases', label: 'Case studies' },
+  { id: 'recommendations', label: 'Recommendations' },
+  { id: 'conclusion', label: 'Conclusion' },
+];
+---
+<Paper id="sok" affils={['King’s College London', 'The Alan Turing Institute', 'University College London', 'Cardiff University', 'KU Leuven', 'Devotion AI Labs']} sections={sections}>
+  <Fragment slot="abstract">
+    <p>Deep Reinforcement Learning (DRL) has achieved remarkable success in domains requiring sequential decision-making, motivating its application to cybersecurity problems. However, transitioning DRL from laboratory simulations to bespoke cyber environments can introduce numerous issues. This is further exacerbated by the often adversarial, non-stationary, and partially-observable nature of most cybersecurity tasks. In this paper, we identify and systematize 11 methodological pitfalls that frequently occur in DRL for cybersecurity (DRL4Sec) literature across the stages of environment modeling, agent training, performance evaluation, and system deployment. By analyzing 66 significant DRL4Sec papers (2018-2025), we quantify the prevalence of each pitfall and find an average of over five pitfalls per paper. We demonstrate the practical impact of these pitfalls using controlled experiments in (i) autonomous cyber defense, (ii) adversarial malware creation, and (iii) web security testing environments. Finally, we provide actionable recommendations for each pitfall to support the development of more rigorous and deployable DRL-based security systems.</p>
+  </Fragment>
+
+  <section class="psec" id="introduction">
+    <h2>Introduction</h2>
+    <div class="prose">
+      <p>Deep Reinforcement Learning (DRL) has successfully improved the speed of matrix multiplication; discovered new protein structures; and, achieved superhuman performance at game playing. Through continuous interaction with a DRL environment (often simply referred to as the environment), DRL agents learn sequential decision-making policies by optimizing the expected cumulative reward over time. Unsurprisingly, these capabilities have motivated applications in cybersecurity, where systems must make adaptive decisions in dynamic, adversarial environments. DRL applications range from detecting malicious activity to evading detection and from autonomously defending networks to discovering vulnerabilities.</p>
+      <p>However, the transition to cybersecurity introduces fundamental challenges compared to traditional domains where DRL has previously excelled, such as game playing, robotics, and computer chip design. In cybersecurity, adversaries actively adapt their strategies to evade detection, systems evolve over time, and defenders typically observe limited information about attacker intentions and system state. These characteristics violate core assumptions of Markov Decision Processes (MDPs), the model for DRL learning tasks, that presume fixed transition dynamics and complete state observability, which can cause agents to be vulnerable to adversaries. In reality, most security tasks are better characterized as Partially Observable MDPs (POMDPs), where agents must infer hidden dynamics from incomplete knowledge: an observation of the system state. Further compounding these challenges are additional task-specific requirements, from information constraints (privacy and access limitations) to practical deployment capabilities (query budgets, real-time constraints). Failing to address these can produce agents that perform well in controlled simulations, however, fail unpredictably and dangerously when deployed in operational environments.</p>
+      <p>To the best of our knowledge, ours is the first work to delineate the pitfalls that arise when applying DRL in security. In 2022, Arp et al. identified 10 pitfalls in 30 supervised learning-based security research papers, finding at least three pitfalls in each paper. More recently, Evertz et al. extended this analysis to LLM-based security research. They identified nine pitfalls, finding at least one in each of the 72 papers reviewed. While there are some parallels between previously identified pitfalls and our work, the sequential decision-making paradigm of DRL is different. This means that although similar in spirit, these parallel ideas manifest in fundamentally different ways. For example, invalid environment modeling opposed to incorrect dataset construction: they have different causes, impacts, and mitigations.</p>
+    </div>
+
+    <blockquote class="excerpt">
+      <p>Collectively, these pitfalls obscure whether reported improvements stem from genuine algorithmic advances or rather from artifacts of simplified environments and incomplete evaluations. More critically, they create a dangerous gap between simulated and operational reality, leading to systems that provide a false sense of security when deployed.</p>
+    </blockquote>
+
+    <div class="prose">
+      <p>Our goal is not to discourage DRL applications in cybersecurity, as it holds genuine promise, but rather to establish methodological standards that enable the community to distinguish robust, deployable solutions from those that succeed only in idealized settings.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="foundations">
+    <h2>Foundational Concepts</h2>
+    <div class="prose">
+      <p>At its core, Reinforcement Learning (RL) problems learn optimal policies through environmental interaction formalized as MDPs. MDPs are defined by the tuple (<i>S</i>, <i>A</i>, <i>R</i>, <i>T</i>, γ), consisting of: a state space <i>S</i>, action space <i>A</i>, reward function <i>R</i> : <i>S</i> × <i>A</i> → ℝ, transition function <i>T</i> : <i>S</i> × <i>A</i> → Δ(<i>S</i>) (where Δ(<i>S</i>) denotes probability distributions over states), and discount factor γ ∈ [0, 1]. An RL ‘agent’ observes a state s<sub>t</sub>, selects an action a<sub>t</sub> according to the policy π, then receives a reward r<sub>t</sub>, and transitions to the next state s<sub>t+1</sub>. The agent then learns a policy that maximizes expected cumulative discounted reward: E[∑<sub>t=0</sub><sup>∞</sup> γ<sup>t</sup>r<sub>t</sub>].</p>
+      <p>Traditional RL algorithms such as Q-Learning maintain explicit tables of state-action values that do not generalize to unseen states, and become intractable for large state or action spaces, which is critical for cybersecurity applications. DRL addresses this limitation by using deep neural networks as function approximators, allowing generalization to unseen states and scalability to high-dimensional problems. The three primary paradigms of DRL are: value-based methods, which approximate the state-action values of Q-learning; policy-based methods, which directly approximate the action distribution of the policy; and, actor-critic methods that combine both paradigms.</p>
+      <p>The MDP formulation relies on the Markov property: that the future state depends only on the current state and action, not on the history of past states. This assumption is critical for DRL but can be violated in cybersecurity settings where attackers maintain a hidden state (e.g., compromised credentials, established persistence) not observable to defenders. In such cases, the problem is more accurately modeled as a POMDP, where the agent receives observations o<sub>t</sub> from an observation function Ω : <i>S</i> → <i>O</i> rather than directly receiving states. POMDPs require agents to maintain belief states or use recurrent architectures to infer the hidden state from observation histories.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+        <svg class="dg" viewBox="0 0 760 340" role="img" aria-label="Side by side comparison. In the MDP that DRL assumes, the agent sends an action and receives the full state and a reward from an environment with fixed dynamics. In a security POMDP, the defender agent sends an action but receives only a partial observation and a reward, the environment hides state such as compromised credentials and persistence, an adaptive adversary sends attacks into the environment, and the transition dynamics drift over time.">
+          <defs>
+            <marker id="ah-mdp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z" /></marker>
+            <marker id="ah-mdp-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z" /></marker>
+          </defs>
+
+          <path class="zone" d="M24 8H272V316L256 332H8V24Z"/>
+          <text class="t-mono t-muted" x="28" y="36">MDP: WHAT DRL ASSUMES</text>
+
+          <path class="box-solid" d="M67 60H225V104L213 116H55V72Z"/>
+          <text class="t-mono t-on-red mid" x="140" y="82">AGENT</text>
+          <text class="t-lg t-on-red mid" x="140" y="104">Policy π</text>
+
+          <path class="box-plain" d="M67 220H225V292L213 304H55V232Z"/>
+          <text class="t-mono t-muted mid" x="140" y="244">ENVIRONMENT</text>
+          <text class="mid" x="140" y="266">fixed dynamics T</text>
+          <text class="t-sm t-muted mid" x="140" y="286">state fully visible</text>
+
+          <path class="ln-red" d="M95 116 V216" marker-end="url(#ah-mdp-red)" />
+          <text class="t-sm t-red end" x="87" y="170">action a<tspan dy="3" font-size="9">t</tspan></text>
+
+          <path class="ln" d="M185 220 V120" marker-end="url(#ah-mdp)" />
+          <text class="t-sm t-ink2" x="193" y="162">state s<tspan dy="3" font-size="9">t</tspan></text>
+          <text class="t-sm t-ink2" x="193" y="180">reward r<tspan dy="3" font-size="9">t</tspan></text>
+
+          <path class="zone" d="M304 8H752V316L736 332H288V24Z"/>
+          <text class="t-mono t-red" x="308" y="36">POMDP: WHAT SECURITY LOOKS LIKE</text>
+
+          <path class="box-solid" d="M342 60H510V104L498 116H330V72Z"/>
+          <text class="t-mono t-on-red mid" x="420" y="82">DEFENDER AGENT</text>
+          <text class="t-lg t-on-red mid" x="420" y="104">Policy + memory</text>
+
+          <path class="box-red" d="M584 60H732V104L720 116H572V72Z"/>
+          <text class="t-mono t-red mid" x="652" y="82">ADVERSARY</text>
+          <text class="mid" x="652" y="104">adapts to evade</text>
+
+          <path class="box-plain" d="M342 200H732V304L720 316H330V212Z"/>
+          <text class="t-mono t-muted" x="346" y="222">ENVIRONMENT</text>
+          <path class="box-dash" d="M356 234H522V292L512 302H346V244Z"/>
+          <text class="t-mono t-muted mid" x="434" y="254">HIDDEN STATE</text>
+          <text class="t-sm mid" x="434" y="274">compromised credentials,</text>
+          <text class="t-sm mid" x="434" y="290">established persistence</text>
+          <text class="t-mono t-red mid" x="627" y="254">NON-STATIONARY</text>
+          <text class="t-sm mid" x="627" y="274">transitions T drift</text>
+          <text class="t-sm mid" x="627" y="290">as systems change</text>
+
+          <path class="ln-red" d="M370 116 V196" marker-end="url(#ah-mdp-red)" />
+          <text class="t-sm t-red end" x="362" y="160">action a<tspan dy="3" font-size="9">t</tspan></text>
+
+          <path class="ln" d="M470 200 V120" marker-end="url(#ah-mdp)" />
+          <text class="t-sm t-ink2" x="478" y="144">partial observation</text>
+          <text class="t-sm t-ink2" x="478" y="160">o = Ω(s)</text>
+          <text class="t-sm t-ink2" x="478" y="176">reward r<tspan dy="3" font-size="9">t</tspan></text>
+
+          <path class="ln-red" d="M652 116 V196" marker-end="url(#ah-mdp-red)" />
+          <text class="t-sm t-red" x="660" y="160">attacks</text>
+        </svg>
+      </div>
+      <figcaption><b>MDP and POMDP.</b> In POMDPs, agents have only partial knowledge of an otherwise ‘hidden’ state. Treating a POMDP as fully observable when it does not model full system dynamics, can lead to suboptimal behavior and systematic blind spots in the learned policy.</figcaption>
+    </figure>
+  </section>
+
+  <section class="psec" id="stages">
+    <h2>Four stages of agent development</h2>
+    <div class="prose">
+      <p>In this paper, we systematize 11 recurring methodological pitfalls that emerge when DRL is employed in cybersecurity (DRL4Sec). We organize these pitfalls across the four stages of agent development.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+        <svg class="dg" viewBox="0 0 700 568" role="img" aria-label="Pipeline from a security problem through four stages to a deployed DRL agent. Environment modeling has MDP Specification, Modeling Correctness and Partial Observability, demonstrated with Link. Agent training has Hyperparameter Reporting, Variance Analysis and Policy Convergence, demonstrated with MiniCAGE. Performance evaluation has Application Motivation, Gain Attribution and Environment Complexity, demonstrated with AutoRobust and SQIRL. System deployment has Underlying Assumptions and Non-Stationarity, demonstrated with MiniCAGE.">
+          <defs>
+            <marker id="ah-stage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z" /></marker>
+          </defs>
+
+          <text class="t-mono t-muted" x="12" y="22">STAGE</text>
+          <text class="t-mono t-muted" x="176" y="22">PITFALLS ENTERING AT THIS STAGE</text>
+          <text class="t-mono t-muted" x="542" y="22">CASE STUDY</text>
+
+          <path class="box-plain" d="M22 34H162V62L152 72H12V44Z"/>
+          <text class="mid" x="87" y="58">Security problem</text>
+          <path class="ln" d="M87 72 V92" marker-end="url(#ah-stage)" />
+          <text class="t-sm t-muted" x="97" y="87">security task</text>
+
+          <path class="box-solid" d="M24 96H162V156L150 168H12V108Z"/>
+          <text class="t-mono t-on-red mid" x="87" y="126">ENVIRONMENT</text>
+          <text class="t-lg t-on-red mid" x="87" y="148">Modeling</text>
+          <path class="box" d="M186 96H286V158L276 168H176V106Z"/>
+          <text class="t-mono t-red mid" x="231" y="120">M-MS</text>
+          <text class="mid" x="231" y="140">MDP</text>
+          <text class="mid" x="231" y="156">Specification</text>
+          <path class="box" d="M304 96H404V158L394 168H294V106Z"/>
+          <text class="t-mono t-red mid" x="349" y="120">M-MC</text>
+          <text class="mid" x="349" y="140">Modeling</text>
+          <text class="mid" x="349" y="156">Correctness</text>
+          <path class="box" d="M422 96H522V158L512 168H412V106Z"/>
+          <text class="t-mono t-red mid" x="467" y="120">M-PO</text>
+          <text class="mid" x="467" y="140">Partial</text>
+          <text class="mid" x="467" y="156">Observability</text>
+          <path class="box-dash" d="M552 96H692V158L682 168H542V106Z"/>
+          <text class="t-mono t-muted mid" x="617" y="122">WEB SECURITY</text>
+          <text class="t-b mid" x="617" y="142">Link</text>
+          <text class="t-sm t-muted mid" x="617" y="158">XSS payloads</text>
+
+          <path class="ln" d="M87 168 V198" marker-end="url(#ah-stage)" />
+          <text class="t-sm t-muted" x="97" y="189">environment (MDP)</text>
+
+          <path class="box-solid" d="M24 202H162V262L150 274H12V214Z"/>
+          <text class="t-mono t-on-red mid" x="87" y="232">AGENT</text>
+          <text class="t-lg t-on-red mid" x="87" y="254">Training</text>
+          <path class="box" d="M186 202H286V264L276 274H176V212Z"/>
+          <text class="t-mono t-red mid" x="231" y="226">T-HR</text>
+          <text class="mid" x="231" y="246">Hyperparameter</text>
+          <text class="mid" x="231" y="262">Reporting</text>
+          <path class="box" d="M304 202H404V264L394 274H294V212Z"/>
+          <text class="t-mono t-red mid" x="349" y="226">T-VA</text>
+          <text class="mid" x="349" y="246">Variance</text>
+          <text class="mid" x="349" y="262">Analysis</text>
+          <path class="box" d="M422 202H522V264L512 274H412V212Z"/>
+          <text class="t-mono t-red mid" x="467" y="226">T-PC</text>
+          <text class="mid" x="467" y="246">Policy</text>
+          <text class="mid" x="467" y="262">Convergence</text>
+          <path class="box-dash" d="M552 202H692V264L682 274H542V212Z"/>
+          <text class="t-mono t-muted mid" x="617" y="228">CYBER DEFENSE</text>
+          <text class="t-b mid" x="617" y="248">MiniCAGE</text>
+          <text class="t-sm t-muted mid" x="617" y="264">network defense</text>
+
+          <path class="ln" d="M87 274 V304" marker-end="url(#ah-stage)" />
+          <text class="t-sm t-muted" x="97" y="295">trained policies</text>
+
+          <path class="box-solid" d="M24 308H162V368L150 380H12V320Z"/>
+          <text class="t-mono t-on-red mid" x="87" y="338">PERFORMANCE</text>
+          <text class="t-lg t-on-red mid" x="87" y="360">Evaluation</text>
+          <path class="box" d="M186 308H286V370L276 380H176V318Z"/>
+          <text class="t-mono t-red mid" x="231" y="332">E-AM</text>
+          <text class="mid" x="231" y="352">Application</text>
+          <text class="mid" x="231" y="368">Motivation</text>
+          <path class="box" d="M304 308H404V370L394 380H294V318Z"/>
+          <text class="t-mono t-red mid" x="349" y="332">E-GA</text>
+          <text class="mid" x="349" y="352">Gain</text>
+          <text class="mid" x="349" y="368">Attribution</text>
+          <path class="box" d="M422 308H522V370L512 380H412V318Z"/>
+          <text class="t-mono t-red mid" x="467" y="332">E-EC</text>
+          <text class="mid" x="467" y="352">Environment</text>
+          <text class="mid" x="467" y="368">Complexity</text>
+          <path class="box-dash" d="M552 308H692V332L682 342H542V318Z"/>
+          <text class="t-sm mid" x="617" y="329"><tspan class="t-b">AutoRobust</tspan>, malware</text>
+          <path class="box-dash" d="M552 346H692V370L682 380H542V356Z"/>
+          <text class="t-sm mid" x="617" y="367"><tspan class="t-b">SQIRL</tspan>, SQL injection</text>
+
+          <path class="ln" d="M87 380 V410" marker-end="url(#ah-stage)" />
+          <text class="t-sm t-muted" x="97" y="401">evaluated agent</text>
+
+          <path class="box-solid" d="M24 414H162V474L150 486H12V426Z"/>
+          <text class="t-mono t-on-red mid" x="87" y="444">SYSTEM</text>
+          <text class="t-lg t-on-red mid" x="87" y="466">Deployment</text>
+          <path class="box" d="M186 414H286V476L276 486H176V424Z"/>
+          <text class="t-mono t-red mid" x="231" y="438">D-UA</text>
+          <text class="mid" x="231" y="458">Underlying</text>
+          <text class="mid" x="231" y="474">Assumptions</text>
+          <path class="box" d="M304 414H404V476L394 486H294V424Z"/>
+          <text class="t-mono t-red mid" x="349" y="438">D-NS</text>
+          <text class="mid" x="349" y="458">Non-</text>
+          <text class="mid" x="349" y="474">Stationarity</text>
+          <path class="box-dash" d="M552 414H692V476L682 486H542V424Z"/>
+          <text class="t-mono t-muted mid" x="617" y="440">CYBER DEFENSE</text>
+          <text class="t-b mid" x="617" y="460">MiniCAGE</text>
+          <text class="t-sm t-muted mid" x="617" y="476">network defense</text>
+
+          <path class="ln" d="M87 486 V516" marker-end="url(#ah-stage)" />
+          <text class="t-sm t-muted" x="97" y="507">into operation</text>
+          <path class="box-plain" d="M22 520H162V548L152 558H12V530Z"/>
+          <text class="mid" x="87" y="544">Deployed DRL agent</text>
+        </svg>
+      </div>
+      <figcaption><b>Figure 1.</b> Common pitfalls of DRL applied to cybersecurity, organized by development stage and separate case studies.</figcaption>
+    </figure>
+
+    <ol class="steps">
+      <li>
+        <div>
+          <h4>Environment modeling</h4>
+          <p>The foundation of applying DRL is formulating a problem as an MDP. As a result of problem diversity, cybersecurity domains typically lack standardized DRL environments necessitating bespoke MDP formulations for each task. First, an incomplete MDP Specification hinders reproducibility and obscures potential flaws in DRL-based approaches. Second, Modeling Correctness issues arise when the underlying security task is incorrectly modeled as an MDP. Third, security problems often lack complete system information in practice; inadequately addressing this can lead to problems of Partial Observability.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Agent training</h4>
+          <p>Unlike supervised learning, where training typically converges given sufficient data, DRL training is inherently more variable and sensitive to numerous factors including: hyperparameter choices, random initialization, sparsity of reward, and the stochastic nature of exploration. First, Hyperparameter Reporting issues arise when critical implementation details necessary for reproduction and validation are omitted. Second, when Variance Analysis is not performed across multiple training runs, the reliable performance of the proposed approach is in question. Third, when Policy Convergence is not achieved, due to premature training termination, it often leads to systems with inconsistent and unpredictable behavior when deployed.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>Performance evaluation</h4>
+          <p>DRL evaluations present unique challenges compared to traditional machine learning. First, Application Motivation issues occur when DRL is used without adequate justification over simpler domain-specific methods. Second, Gain Attribution issues arise when performance gains are due to the basic agent capabilities rather than the learned policy itself. Third, Environment Complexity creates misleading results when training and evaluation occur in overly simplified settings that do not capture real-world complexity.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h4>System deployment</h4>
+          <p>Avoiding pitfalls in modeling, training, and evaluation does not guarantee an agent’s reliable performance in the complexities and uncertainties of real-world systems. First, Underlying Assumptions issues arise when agent design or environment assumptions cannot be satisfied in practice. Second, Non-Stationarity problems occur when the evolving nature of security environments are not adequately captured.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Remark</span><p>This work identifies recurring pitfalls in DRL4Sec literature. These are not failures of individual researchers but systematic challenges that emerge when adapting DRL to cybersecurity. We frame our analysis around pitfall patterns over critiquing specific papers, and while we list the papers reviewed, we do not report the per-paper pitfalls.</p></div>
+  </section>
+
+  <section class="psec" id="review">
+    <h2>Review Methodology</h2>
+    <div class="prose">
+      <p>We conducted a systematic literature collection using IEEE Xplore, ACM DL, and Google Scholar. We performed our collection in two rounds, first in April 2025 using only Google Scholar for initial pitfall identification and second in December 2025 using all search tools to complete the corpus and update citation counts.</p>
+      <p><strong>Significance Criteria.</strong> To ensure academic impact and quality, papers must satisfy at least one of the following criteria: (1) published in a first- or second-tier (CORE-ranked A* or A) venue in machine learning, software engineering, or security; or (2) demonstrate significant research impact by averaging more than 10 citations per year since publication from a reputable publisher.</p>
+      <p><strong>Topic Criteria.</strong> We define the scope of papers to be included in our work as: direct applications of DRL to cybersecurity problems and have DRL as the primary methodological contribution. We then excluded several categories of related but out-of-scope work: (1) secondary studies (surveys, systematic reviews, etc.); (2) research on the security of DRL systems, i.e., non-DRL-based attacks against DRL agents (which are not applied to cybersecurity problems); (3) pure game-theoretic approaches without DRL; (4) non-deep RL methods (e.g., tabular Q-learning, which fail in complex environments); and (5) Multi-Agent RL (MARL) systems, a separate research domain (which require distinct formulations and analysis).</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+        <svg class="dg" viewBox="0 0 560 352" role="img" aria-label="Review pipeline. 1,603 de-duplicated papers from IEEE Xplore, ACM DL and Google Scholar pass the Significance Criteria to give 363 papers, then the Topic Criteria to give 66 papers, 37 from April and 29 from December. Two independent reviewers rate the 11 pitfalls, reaching Cohen's kappa of 0.712 and 81.5% initial agreement, with disagreements resolved by discussion in favour of the less severe rating.">
+          <defs>
+            <marker id="ah-review" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z" /></marker>
+          </defs>
+
+          <path class="box" d="M28 12H216V52L204 64H16V24Z"/>
+          <text class="t-lg mid" x="116" y="36">1,603 papers</text>
+          <text class="t-sm t-muted mid" x="116" y="54">after de-duplication</text>
+          <text class="t-sm t-ink2" x="236" y="34">IEEE Xplore, ACM DL, Google Scholar</text>
+          <text class="t-sm t-muted" x="236" y="50">collected April and December 2025</text>
+
+          <path class="ln" d="M116 64 V100" marker-end="url(#ah-review)" />
+          <text class="t-sm t-b t-red" x="132" y="80">Significance Criteria</text>
+          <text class="t-sm t-muted" x="132" y="96">CORE A* or A venue, or &gt; 10 citations a year</text>
+
+          <path class="box" d="M28 104H216V144L204 156H16V116Z"/>
+          <text class="t-lg mid" x="116" y="135">363 papers</text>
+
+          <path class="ln" d="M116 156 V192" marker-end="url(#ah-review)" />
+          <text class="t-sm t-b t-red" x="132" y="172">Topic Criteria</text>
+          <text class="t-sm t-muted" x="132" y="188">DRL is the primary contribution; English; &gt; 4 pages</text>
+
+          <path class="box-solid" d="M28 196H216V236L204 248H16V208Z"/>
+          <text class="t-lg t-on-red mid" x="116" y="220">66 papers</text>
+          <text class="t-sm t-on-red mid" x="116" y="238">37 April + 29 December</text>
+
+          <path class="ln" d="M116 248 V284" marker-end="url(#ah-review)" />
+          <text class="t-sm t-b t-red" x="132" y="264">Two independent reviewers</text>
+          <text class="t-sm t-muted" x="132" y="280">rate all 11 pitfalls: present, partial, not present</text>
+
+          <path class="box" d="M28 288H216V328L204 340H16V300Z"/>
+          <text class="t-lg mid" x="116" y="312">κ = 0.712</text>
+          <text class="t-sm t-muted mid" x="116" y="330">81.5% initial agreement</text>
+          <text class="t-sm t-ink2" x="236" y="310">Disagreements resolved by discussion;</text>
+          <text class="t-sm t-ink2" x="236" y="326">ambiguous cases get the less severe rating</text>
+        </svg>
+      </div>
+      <figcaption><b>Collection.</b> After the final collection, we performed de-duplication, resulting in 1,603 papers. Then, we performed the Significance Criteria filtering to arrive at 363 papers. Finally, we screened the papers for Topic Criteria filtering alongside requirements for language (English) and length (&gt; 4 pages) to produce the final 66 papers used in our work, with 37 from the April and 29 from the December collection.</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p><strong>Review Process.</strong> We began with a pilot review of the 37 papers from the April collection to identify themes and commonalities. Using this review, we isolated the reoccurring issues in DRL4Sec papers and formalized the 11 pitfalls discussed in this work. We then evaluated the complete 66 papers for each of the identified pitfalls. Each paper was independently evaluated by two reviewers using the pitfall definitions.</p>
+    </div>
+
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4 class="red">Present</h4><p>Clearly and completely exhibited.</p></div>
+      <div class="card"><h4>Partially present</h4><p>Partial manifestations or acknowledged but unaddressed.</p></div>
+      <div class="card"><h4>Not present</h4><p>Adequately handled or not applicable.</p></div>
+    </div>
+
+    <div class="prose">
+      <p>Following the independent reviews, the initial prevalence scores achieved substantial agreement, according to a Cohen’s κ of 0.712 and the Landis–Koch interpretation. With a 81.5% total agreement on pitfall prevalence, the remaining disagreements (18.5%) around the severity of pitfalls for the papers reviewed were resolved through discussion between the reviewers. When evidence was ambiguous, we gave the benefit of the doubt to the paper by using the less severe pitfall classification to resolve the disagreement (e.g., marking as not present if reviews were split between not present and partially present).</p>
+      <p><strong>Corpus Characteristics.</strong> The 66 papers in our corpus were published between 2018 and 2025 across a diverse set of cybersecurity tasks.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">The 66 reviewed papers by security domain</p>
+        <p class="chart-sub">Papers per domain, 2018–2025. Red: domains of the case studies.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Case-study domain</span><span><i class="sw-n"></i>Other domains</span></div>
+      <div class="hb" role="list" style="--max:20; --label-w:14rem">
+        <div class="hb-row" role="listitem" data-tip="Adversarial sample creation|15 papers, 22.7% of the corpus|Case study: AutoRobust" aria-label="Adversarial sample creation: 15 papers, 22.7%, case-study domain">
+          <span class="hb-label">Adversarial sample creation</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:15"></span></span>
+          <span class="hb-val hi">15</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Intrusion detection|15 papers, 22.7% of the corpus" aria-label="Intrusion detection: 15 papers, 22.7%">
+          <span class="hb-label">Intrusion detection</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:15"></span></span>
+          <span class="hb-val">15</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Fuzzing and web security|10 papers, 15.2% of the corpus|Case studies: Link, SQIRL" aria-label="Fuzzing and web security: 10 papers, 15.2%, case-study domain">
+          <span class="hb-label">Fuzzing and web security</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:10"></span></span>
+          <span class="hb-val hi">10</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Autonomous cyber defense|7 papers, 10.6% of the corpus|Case study: MiniCAGE" aria-label="Autonomous cyber defense: 7 papers, 10.6%, case-study domain">
+          <span class="hb-label">Autonomous cyber defense</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:7"></span></span>
+          <span class="hb-val hi">7</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Penetration testing|6 papers, 9.1% of the corpus" aria-label="Penetration testing: 6 papers, 9.1%">
+          <span class="hb-label">Penetration testing</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:6"></span></span>
+          <span class="hb-val">6</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Cyber-physical systems security|4 papers, 6.1% of the corpus" aria-label="Cyber-physical systems security: 4 papers, 6.1%">
+          <span class="hb-label">Cyber-physical systems security</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:4"></span></span>
+          <span class="hb-val">4</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Malware detection|4 papers, 6.1% of the corpus" aria-label="Malware detection: 4 papers, 6.1%">
+          <span class="hb-label">Malware detection</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:4"></span></span>
+          <span class="hb-val">4</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Blockchain security|3 papers, 4.5% of the corpus" aria-label="Blockchain security: 3 papers, 4.5%">
+          <span class="hb-label">Blockchain security</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:3"></span></span>
+          <span class="hb-val">3</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Hardware security|2 papers, 3.0% of the corpus" aria-label="Hardware security: 2 papers, 3.0%">
+          <span class="hb-label">Hardware security</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:2"></span></span>
+          <span class="hb-val">2</span>
+        </div>
+      </div>
+      <div class="hb-axis" aria-hidden="true" style="--label-w:14rem">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">5</span><span style="left:50%">10</span><span style="left:75%">15</span><span style="left:100%">20</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Domain</th><th class="n">Papers</th><th class="n">Share</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>Adversarial sample creation</td><td class="n">15</td><td class="n">22.7%</td></tr>
+              <tr><td>Intrusion detection</td><td class="n">15</td><td class="n">22.7%</td></tr>
+              <tr class="hl"><td>Fuzzing and web security</td><td class="n">10</td><td class="n">15.2%</td></tr>
+              <tr class="hl"><td>Autonomous cyber defense</td><td class="n">7</td><td class="n">10.6%</td></tr>
+              <tr><td>Penetration testing</td><td class="n">6</td><td class="n">9.1%</td></tr>
+              <tr><td>Cyber-physical systems security</td><td class="n">4</td><td class="n">6.1%</td></tr>
+              <tr><td>Malware detection</td><td class="n">4</td><td class="n">6.1%</td></tr>
+              <tr><td>Blockchain security</td><td class="n">3</td><td class="n">4.5%</td></tr>
+              <tr><td>Hardware security</td><td class="n">2</td><td class="n">3.0%</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <p>These domains represent the major application areas of DRL4Sec, showing concentration in areas requiring complex sequential decision-making. First, we consider Autonomous Cyber defense (ACD) as these environments are well established and often reused across subsequent works. Then, we consider adversarial malware generation and web security testing as they are some of the most prominent applications of DRL4Sec across the 66 papers studied (22.7% and 15.2%, respectively).</p>
+    </div>
+  </section>
+
+  <section class="psec" id="prevalence">
+    <h2>Prevalence Analysis</h2>
+    <div class="prose">
+      <p>Through systematic analysis of 66 DRL4Sec papers, published between 2018 and 2025, we quantify the prevalence and severity of each pitfall. Our review reveals widespread issues where every paper contains at least two pitfalls, with an average of 5.8. Furthermore, across the individual pitfalls, 28.8% of papers fall victim to the least common pitfall (Underlying Assumptions), with the most common being present in 71.2% of papers (Policy Convergence).</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b class="red">5.8</b><span>pitfalls per paper, on average; every paper contains at least two</span></div>
+      <div class="stat"><b>71.2%</b><span>lack clear evidence of policy convergence</span></div>
+      <div class="stat"><b>28.8%</b><span>fall victim to the least common pitfall (Underlying Assumptions)</span></div>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">How often each pitfall appears</p>
+        <p class="chart-sub">Share of the 66 papers with each pitfall present or partially present, grouped by stage.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Present</span><span><i class="sw-b"></i>Partially present</span></div>
+      <div class="hb" role="list" style="--max:100; --label-w:14rem">
+        <div class="hb-group" role="presentation">Environment modeling</div>
+        <div class="hb-row" role="listitem" data-tip="MDP Specification (M-MS)|Present: 4 papers (6.1%)|Partially present: 35 papers (53.0%)|Either: 39 of 66 (59.1%)" aria-label="M-MS MDP Specification: present in 4 papers, partially present in 35, 59.1% in total">
+          <span class="hb-label"><span class="hb-code">M-MS</span>MDP Specification</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:6.1"></span><span class="hb-seg hb-b" style="--v:53.0"></span></span>
+          <span class="hb-val">59.1%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Modeling Correctness (M-MC)|Present: 17 papers (25.8%)|Partially present: 6 papers (9.1%)|Either: 23 of 66 (34.9%)" aria-label="M-MC Modeling Correctness: present in 17 papers, partially present in 6, 34.9% in total">
+          <span class="hb-label"><span class="hb-code">M-MC</span>Modeling Correctness</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:25.8"></span><span class="hb-seg hb-b" style="--v:9.1"></span></span>
+          <span class="hb-val">34.9%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Partial Observability (M-PO)|Present: 20 papers (30.3%)|Partially present: 20 papers (30.3%)|Either: 40 of 66 (60.6%)" aria-label="M-PO Partial Observability: present in 20 papers, partially present in 20, 60.6% in total">
+          <span class="hb-label"><span class="hb-code">M-PO</span>Partial Observability</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:30.3"></span><span class="hb-seg hb-b" style="--v:30.3"></span></span>
+          <span class="hb-val">60.6%</span>
+        </div>
+        <div class="hb-group" role="presentation">Agent training</div>
+        <div class="hb-row" role="listitem" data-tip="Hyperparameter Reporting (T-HR)|Present: 21 papers (31.8%)|Partially present: 24 papers (36.4%)|Either: 45 of 66 (68.2%)" aria-label="T-HR Hyperparameter Reporting: present in 21 papers, partially present in 24, 68.2% in total">
+          <span class="hb-label"><span class="hb-code">T-HR</span>Hyperparameter Reporting</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:31.8"></span><span class="hb-seg hb-b" style="--v:36.4"></span></span>
+          <span class="hb-val">68.2%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Variance Analysis (T-VA)|Present: 38 papers (57.6%)|Partially present: 6 papers (9.1%)|Either: 44 of 66 (66.7%)" aria-label="T-VA Variance Analysis: present in 38 papers, partially present in 6, 66.7% in total">
+          <span class="hb-label"><span class="hb-code">T-VA</span>Variance Analysis</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:57.6"></span><span class="hb-seg hb-b" style="--v:9.1"></span></span>
+          <span class="hb-val">66.7%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Policy Convergence (T-PC)|Present: 28 papers (42.4%)|Partially present: 19 papers (28.8%)|Either: 47 of 66 (71.2%), the most common" aria-label="T-PC Policy Convergence: present in 28 papers, partially present in 19, 71.2% in total, the most common pitfall">
+          <span class="hb-label"><span class="hb-code">T-PC</span>Policy Convergence</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:42.4"></span><span class="hb-seg hb-b" style="--v:28.8"></span></span>
+          <span class="hb-val hi">71.2%</span>
+        </div>
+        <div class="hb-group" role="presentation">Performance evaluation</div>
+        <div class="hb-row" role="listitem" data-tip="Application Motivation (E-AM)|Present: 8 papers (12.1%)|Partially present: 21 papers (31.8%)|Either: 29 of 66 (43.9%)" aria-label="E-AM Application Motivation: present in 8 papers, partially present in 21, 43.9% in total">
+          <span class="hb-label"><span class="hb-code">E-AM</span>Application Motivation</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:12.1"></span><span class="hb-seg hb-b" style="--v:31.8"></span></span>
+          <span class="hb-val">43.9%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Gain Attribution (E-GA)|Present: 15 papers (22.7%)|Partially present: 18 papers (27.3%)|Either: 33 of 66 (50.0%)" aria-label="E-GA Gain Attribution: present in 15 papers, partially present in 18, 50.0% in total">
+          <span class="hb-label"><span class="hb-code">E-GA</span>Gain Attribution</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:22.7"></span><span class="hb-seg hb-b" style="--v:27.3"></span></span>
+          <span class="hb-val">50.0%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Environment Complexity (E-EC)|Present: 12 papers (18.2%)|Partially present: 15 papers (22.7%)|Either: 27 of 66 (40.9%)" aria-label="E-EC Environment Complexity: present in 12 papers, partially present in 15, 40.9% in total">
+          <span class="hb-label"><span class="hb-code">E-EC</span>Environment Complexity</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:18.2"></span><span class="hb-seg hb-b" style="--v:22.7"></span></span>
+          <span class="hb-val">40.9%</span>
+        </div>
+        <div class="hb-group" role="presentation">System deployment</div>
+        <div class="hb-row" role="listitem" data-tip="Underlying Assumptions (D-UA)|Present: 10 papers (15.2%)|Partially present: 9 papers (13.6%)|Either: 19 of 66 (28.8%), the least common" aria-label="D-UA Underlying Assumptions: present in 10 papers, partially present in 9, 28.8% in total, the least common pitfall">
+          <span class="hb-label"><span class="hb-code">D-UA</span>Underlying Assumptions</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:15.2"></span><span class="hb-seg hb-b" style="--v:13.6"></span></span>
+          <span class="hb-val hi">28.8%</span>
+        </div>
+        <div class="hb-row" role="listitem" data-tip="Non-Stationarity (D-NS)|Present: 23 papers (34.9%)|Partially present: 13 papers (19.7%)|Either: 36 of 66 (54.5%)" aria-label="D-NS Non-Stationarity: present in 23 papers, partially present in 13, 54.5% in total">
+          <span class="hb-label"><span class="hb-code">D-NS</span>Non-Stationarity</span>
+          <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:34.9"></span><span class="hb-seg hb-b" style="--v:19.7"></span></span>
+          <span class="hb-val">54.5%</span>
+        </div>
+      </div>
+      <div class="hb-axis" aria-hidden="true" style="--label-w:14rem">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        <span>n = 66. Totals are present plus partially present.</span>
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Code</th><th>Pitfall</th><th>Stage</th><th class="n">Present</th><th class="n">Partial</th><th class="n">Total</th></tr></thead>
+            <tbody>
+              <tr><td>M-MS</td><td>MDP Specification</td><td>Modeling</td><td class="n">4</td><td class="n">35</td><td class="n">39 (59.1%)</td></tr>
+              <tr><td>M-MC</td><td>Modeling Correctness</td><td>Modeling</td><td class="n">17</td><td class="n">6</td><td class="n">23 (34.9%)</td></tr>
+              <tr><td>M-PO</td><td>Partial Observability</td><td>Modeling</td><td class="n">20</td><td class="n">20</td><td class="n">40 (60.6%)</td></tr>
+              <tr><td>T-HR</td><td>Hyperparameter Reporting</td><td>Training</td><td class="n">21</td><td class="n">24</td><td class="n">45 (68.2%)</td></tr>
+              <tr><td>T-VA</td><td>Variance Analysis</td><td>Training</td><td class="n">38</td><td class="n">6</td><td class="n">44 (66.7%)</td></tr>
+              <tr class="hl"><td>T-PC</td><td>Policy Convergence</td><td>Training</td><td class="n">28</td><td class="n">19</td><td class="n">47 (71.2%)</td></tr>
+              <tr><td>E-AM</td><td>Application Motivation</td><td>Evaluation</td><td class="n">8</td><td class="n">21</td><td class="n">29 (43.9%)</td></tr>
+              <tr><td>E-GA</td><td>Gain Attribution</td><td>Evaluation</td><td class="n">15</td><td class="n">18</td><td class="n">33 (50.0%)</td></tr>
+              <tr><td>E-EC</td><td>Environment Complexity</td><td>Evaluation</td><td class="n">12</td><td class="n">15</td><td class="n">27 (40.9%)</td></tr>
+              <tr><td>D-UA</td><td>Underlying Assumptions</td><td>Deployment</td><td class="n">10</td><td class="n">9</td><td class="n">19 (28.8%)</td></tr>
+              <tr><td>D-NS</td><td>Non-Stationarity</td><td>Deployment</td><td class="n">23</td><td class="n">13</td><td class="n">36 (54.5%)</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <p>Most commonly, we find that: 71.2% lack clear evidence of policy convergence, 60.6% fail to address partial observability, 66.7% neglect variance analysis, and 40.9% evaluate in oversimplified environments.</p>
+      <p>The gap in convergence reporting suggests that although the need for convergence may be understood, the concrete demonstration of policy convergence and stability is often under-emphasized. Such prevalence indicates that partial observability is a pervasive challenge in DRL applications to cybersecurity. While the number of papers acknowledging the issue show that some awareness exists, it does not match the high prevalence of partial observability in cybersecurity tasks.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="pitfalls">
+    <h2>Pitfall Taxonomy</h2>
+
+    <div class="explorer">
+      <div class="ex-tabs" aria-label="Pitfalls">
+        <div class="ex-group">Environment modeling</div>
+        <button class="ex-tab" type="button" aria-controls="pf-mms" aria-selected="true"><span class="hb-code">M-MS</span>MDP Specification</button>
+        <button class="ex-tab" type="button" aria-controls="pf-mmc"><span class="hb-code">M-MC</span>Modeling Correctness</button>
+        <button class="ex-tab" type="button" aria-controls="pf-mpo"><span class="hb-code">M-PO</span>Partial Observability</button>
+        <div class="ex-group">Agent training</div>
+        <button class="ex-tab" type="button" aria-controls="pf-thr"><span class="hb-code">T-HR</span>Hyperparameter Reporting</button>
+        <button class="ex-tab" type="button" aria-controls="pf-tva"><span class="hb-code">T-VA</span>Variance Analysis</button>
+        <button class="ex-tab" type="button" aria-controls="pf-tpc"><span class="hb-code">T-PC</span>Policy Convergence</button>
+        <div class="ex-group">Performance evaluation</div>
+        <button class="ex-tab" type="button" aria-controls="pf-eam"><span class="hb-code">E-AM</span>Application Motivation</button>
+        <button class="ex-tab" type="button" aria-controls="pf-ega"><span class="hb-code">E-GA</span>Gain Attribution</button>
+        <button class="ex-tab" type="button" aria-controls="pf-eec"><span class="hb-code">E-EC</span>Environment Complexity</button>
+        <div class="ex-group">System deployment</div>
+        <button class="ex-tab" type="button" aria-controls="pf-dua"><span class="hb-code">D-UA</span>Underlying Assumptions</button>
+        <button class="ex-tab" type="button" aria-controls="pf-dns"><span class="hb-code">D-NS</span>Non-Stationarity</button>
+      </div>
+      <div>
+        <div class="ex-panel" id="pf-mms" data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">M-MS</span>MDP Specification</h4>
+          <p class="def">The MDP is ill-defined, so that one or more components (state space, action space, reward function, and transition dynamics) remain unclear.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we observed fully unspecified MDP definitions in 4 papers (6.1%), partially unspecified definitions in 35 papers (53.0%), and complete definitions in the remaining 27 papers (40.9%). Among the full and partial cases the distribution of under-specified components are as follows: the state space was the most frequent (22 papers, 33.3%), followed by transitions (18 papers, 27.3%), action space (14 papers, 21.2%), and reward function (10 papers, 15.2%). The high prevalence indicates a significant documentation issue in DRL4Sec literature, reflecting the inherent difficulty of translating complex security scenarios into fully specified environments.</dd>
+            <dt>Security implications</dt><dd>The risks that ambiguous definitions can cause in real-world deployments is threefold. First, it obfuscates other pitfalls in the problem formulation, e.g., state spaces that do not address partial observability allow attacks to go undetected despite causing harm to the system. Second, it hinders reproducibility, as attempts at reconstruction may yield different MDPs. For instance, ‘rewards for attack detection with penalties for false positives’ can produce vastly different behaviors due to variations in relative reward magnitudes. Finally, assessing the real-world viability of the proposed solution becomes significantly harder.</dd>
+            <dt>Recommendations</dt><dd>Complete MDP specification requires unambiguous definition of: (1) the state space, including available information, dimensionality, and semantic meaning of individual state values; (2) the action space, specifying all available actions and connection to the security task; (3) the transition function, describing how actions influence state changes, including stochasticity and terminal conditions; and (4) the reward function, providing the complete formulation with rationale for the contribution of each component to the overall objective. Crucially, assumptions, approximations, or simplifications must be explicitly discussed.</dd>
+            <dt>Case study</dt><dd><a href="#case-modeling">Link (XSS payloads)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-mmc" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">M-MC</span>Modeling Correctness</h4>
+          <p class="def">The modeled environment violates the Markov assumption or does not correctly encapsulate the actual MDP underlying the security problem.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we observed incorrect MDP modeling in 17 papers (25.8%), minor modeling errors in 6 papers (9.1%), and valid modeling in the remaining 43 papers (65.2%). The combined 34.9% of partially and fully present is primarily due to issues with state representation and transitions.</dd>
+            <dt>Security implications</dt><dd>When the Markov property is violated or the task is misspecified as an MDP, agents can learn spurious correlations between unrelated decisions. For example, formulating a classification task as sequential decision-making induces nonexistent temporal dependencies between <a href="/papers/drmd/">independent samples</a>. Separately, misaligned rewards can incentivize agents to maximize return through behaviors that undermine security objectives via reward hacking. Together, these modeling errors produce brittle policies that appear effective in controlled experiments but fail unpredictably when deployed.</dd>
+            <dt>Recommendations</dt><dd>First, the state transitions must reflect genuine sequential structure (next states are consequences of current state and action) rather than artificially chaining independent decisions. For example, independent samples in a detection task should seek alternative methods such as deep contextual bandits to avoid spurious correlations between states. If complete state information is unavailable in practice, the problem should be formulated as a POMDP with appropriate constraints rather than forcing a potentially misaligned MDP representation.</dd>
+            <dt>Case study</dt><dd><a href="#case-modeling">Link (XSS payloads)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-mpo" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">M-PO</span>Partial Observability</h4>
+          <p class="def">The environment is inherently partially observable (i.e. a POMDP); however, it is treated as if it were fully observable without mitigating the partial observability.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we identified clear partial observability issues in 20 papers (30.3%) and lesser issues in 20 papers (30.3%). Of these 40, 8 papers (12.1%) explicitly acknowledge the presence and potential issues of partial observability, yet do not mitigate it. The remaining 26 papers (39.4%) either did not consider a partially observable task or directly accounted for it in their modeling.</dd>
+            <dt>Security implications</dt><dd>Unmitigated partial observability often manifests as a vulnerability after training. Therefore, agents can develop ‘blind spots’ due to the unobservability of a system. Such policies may be optimal in simulation, but in the real-world they have a limited ‘key hole’ view, leaving them vulnerable to malicious actors.</dd>
+            <dt>Recommendations</dt><dd>Partial observability may be inherent to security tasks which often feature incomplete, delayed, or deliberately concealed information. Addressing this in modeling is therefore essential for making robust decisions under uncertainty. In such cases it should be explicitly formulated as a POMDP. Commonly this can be achieved by either encoding recent observations into the state representation, such as frame stacking used in Atari games, or employing recurrent policies (e.g., LSTM or Transformer) to maintain an internal memory. Other approaches aim to model the unobserved information, using techniques such as Hidden Markov Models or model-based approaches, to mitigate the impact of M-PO.</dd>
+            <dt>Case study</dt><dd><a href="#case-modeling">Link (XSS payloads)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-thr" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">T-HR</span>Hyperparameter Reporting</h4>
+          <p class="def">The hyperparameters governing training and agent architecture of an approach are not reported.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we observed the complete absence of hyperparameters in 21 papers (31.8%), partial reporting of hyperparameters in 24 papers (36.4%), and complete hyperparameter reporting in the remaining 21 papers (31.8%). This omission fundamentally undermines reproducibility and hinders the advancement of DRL4Sec applications.</dd>
+            <dt>Security implications</dt><dd>Since minor variations in design choices can have a disproportionate effect on agent behavior, under-specifying hyperparameters makes results challenging to verify. Hyperparameter transparency is not only a matter of scientific rigor, but a prerequisite for establishing reliable and robust DRL cybersecurity applications that can perform tasks effectively.</dd>
+            <dt>Recommendations</dt><dd>At minimum, publications should report: (1) algorithm-specific hyperparameters, e.g., learning rate, discount factor γ, batch size, replay buffer size, and exploration parameters such as ε; (2) neural network architecture details, e.g., layer types, dimensions, activation functions, normalization techniques; (3) optimization settings, e.g., optimizer type, learning rate, gradient clipping coefficients; and (4) training procedures, e.g., total timesteps, update frequency, number of environments for parallel training. When space constraints prevent inclusion in the main text, it should be provided in appendices or supplementary materials.</dd>
+            <dt>Case study</dt><dd><a href="#case-training">MiniCAGE (network defense)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-tva" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">T-VA</span>Variance Analysis</h4>
+          <p class="def">The inherent variance of DRL training is not investigated through explicit analysis of performance over multiple policies.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we observed no discussion of multiple training ‘runs’ or variance analysis in 38 papers (57.6%), partial consideration of variance in 6 papers (9.1%), and multiple runs with variance analysis in the remaining 22 papers (33.3%). Indeed, two thirds of reviewed studies (44 papers, 66.7%) insufficiently consider variance.</dd>
+            <dt>Security implications</dt><dd>Favorable initial conditions, or ‘beginner’s luck’, a single run can over- or underestimate the perceived performance beyond the realistic mean of multiple runs. This is particularly unsafe in security contexts where consistent and reliable performance is crucial. Dismissing an approach based on a single bad run that can perform well on average, risks rejecting a valuable security solution. Alternately, agents that over-promise and under-deliver on average, expose end users to unnecessary risk.</dd>
+            <dt>Recommendations</dt><dd>As a lone trained agent is insufficient to establish representative performance of that agent, it is essential to train and evaluate multiple trained policies and report the statistical variance. Consequently, we recommend a minimum of N ≥ 5, and encourage higher runs (N ≥ 20 or N ≥ 50) for stronger statistical claims. To better represent the variance in agent behavior, statistical metrics must also be reported, for example: 95% confidence intervals, inter-quartile range (IQR), and risk-sensitive measures such as Conditional Value at Risk (CVaR). Variance should be reported within and between training episodes, and certainly for the final policies during testing.</dd>
+            <dt>Case study</dt><dd><a href="#case-training">MiniCAGE (network defense)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-tpc" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">T-PC</span>Policy Convergence</h4>
+          <p class="def">The convergence of the policy is not demonstrated prior to the termination of training.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we observed no demonstration of convergence in 28 papers (42.4%), partial demonstration or discussion in 19 papers (28.8%), and demonstration of convergence in the remaining 19 papers (28.8%). While many papers discuss the reasoning for the length of training used or mention convergence, explicit demonstration is often missing.</dd>
+            <dt>Security implications</dt><dd>Without demonstrating convergence, it is difficult to establish if an agent has learned a truly robust policy or if premature termination has left gaps in its decision-making for certain scenarios. Non-converged policies pose an increased risk as they behave unpredictably, which can be exacerbated in rare edge cases. In such scenarios, even otherwise optimal agents can behave erratically, leading to clear vulnerabilities in deployment.</dd>
+            <dt>Recommendations</dt><dd>The convergence of policies should be evaluated over the learning process to reveal training dynamics, such as instability or temporary performance plateaus before final convergence. We recommend the inclusion of figures showing episodic reward or task-specific metrics as clear evidence of stabilization before training termination. To ensure convergence is consistent, measures of training variance should be included.</dd>
+            <dt>Case study</dt><dd><a href="#case-training">MiniCAGE (network defense)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-eam" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">E-AM</span>Application Motivation</h4>
+          <p class="def">The application of DRL over traditional methods is not justified empirically or theoretically.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we found that 8 papers (12.1%) provide neither empirical or theoretical motivation for their use of DRL; 21 papers (31.8%) offered only one of the forms of motivation; and 37 papers (56.1%) motivated in both forms. The majority of partial justification (17 papers, 25.8%) arises from only having theoretical motivation.</dd>
+            <dt>Security implications</dt><dd>The application of DRL in security is relatively under-explored in comparison to other learning paradigms. Replacing extensively studied methods with DRL, besides the other pitfalls we explore here, runs the risk of introducing novel attack surfaces. Therefore, the benefits of a DRL-based approach should surpass engineering in-domain approaches to replicate the sequential nature of DRL environments.</dd>
+            <dt>Recommendations</dt><dd>While DRL can perform a wide variety of complex tasks, much like other ML paradigms it is not suitable for all tasks. As a result, applying DRL to a novel task should be justified theoretically and, when possible, empirically. When baselines are available for comparison, they should be used to demonstrate the advantage of DRL, in addition to the motivation for applying DRL in the first place. When baselines are not available, motivation must demonstrate the necessity of re-formulating to a DRL task.</dd>
+            <dt>Case study</dt><dd><a href="#case-evaluation">Adversarial malware creation</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-ega" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">E-GA</span>Gain Attribution</h4>
+          <p class="def">Improvements stem from additional information or capabilities provided in MDP design rather than the learned policy itself.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we found that 15 papers (22.7%) did not clearly demonstrate that the agent improved over baseline environmental performance; 18 papers (27.3%) demonstrated partial evaluation of where performance gains come from; and 33 papers (50.0%) adequately showed the contribution of the learned policy. Notably, 6 of the 15 papers fully exhibiting this pitfall explicitly acknowledge it but do not attempt to disentangle the sources of improvement.</dd>
+            <dt>Security implications</dt><dd>Misrepresentative gains can create false confidence in a proposed DRL approach. Such agents can give a false sense of robustness as their learned policy is not the primary source of effectiveness, making it easier for an adversary to attack. Thus such improvements reflect stronger baseline design rather than effective learning, and could be replicated by other agents given the same capabilities.</dd>
+            <dt>Recommendations</dt><dd>The value of the learned policy can be disentangled from environmental artifacts through two kinds of ablation. First, evaluating performance under random action sampling isolates the contribution of policy learning and establishes a baseline performance in the environment. As a result, improvements that arise solely from state-action engineering should be reported separately from the trained policy performance. Second, comparisons between different approaches (both DRL and other-paradigms) should be performed with equivalent information and capabilities (e.g., state–action spaces).</dd>
+            <dt>Case study</dt><dd><a href="#case-evaluation">AutoRobust (adversarial malware)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-eec" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">E-EC</span>Environment Complexity</h4>
+          <p class="def">Training and evaluation occur in an environment that is contrived or overly simplified.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we found that 12 papers (18.2%) evaluated their approaches in overly simplified or contrived environments; 15 papers (22.7%) made some effort to improve environmental realism; and 39 papers (59.1%) evaluated on sufficiently realistic environments.</dd>
+            <dt>Security implications</dt><dd>Agents trained in overly simplified environments may learn effective policies, but these may be incapable of transferring to, or learning in, real environments. Indeed, the transfer from simulated to real environments (commonly referred to as the ‘sim-to-real’ gap) can lead to catastrophic failures. A concrete example of this is reward hacking where agents learn to exploit flaws in environmental modeling to maximize rewards, leading to policies that appear optimal but provide no genuine security value. These flaws become particularly dangerous in security contexts where the stakes of failure are high: organizations may deploy systems based on promising laboratory results only to discover that they underperform or are vulnerable in the real-world.</dd>
+            <dt>Recommendations</dt><dd>As a result of transferability issues from the sim-to-real gap, it is best practice to train and evaluate DRL in the most realistic environment feasible. Applying DRL to security problems should follow the evaluation best practices from that specific security domain. However, in some domains the use of real-world data or systems is challenging or infeasible. In such cases benchmarks should be used to demonstrate impact.</dd>
+            <dt>Case study</dt><dd><a href="#case-evaluation">SQIRL (SQL injection)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-dua" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">D-UA</span>Underlying Assumptions</h4>
+          <p class="def">The environment or agent training requirements cannot be satisfied in real-world applications.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we found that 10 papers (15.2%) contained unrealistic assumptions that would prevent real-world deployment (e.g., network defense on abstract graph structures); 9 papers (13.6%) suffered from minor or partially unrealistic assumptions (e.g., requiring real-time high quality labeled data in live deployments); and 47 papers (71.2%) operated under realistic deployment assumptions.</dd>
+            <dt>Security implications</dt><dd>Underlying Assumptions can create overconfidence in the capabilities of a DRL-based approach, which may not be directly evident during deployment. Such a system could be ineffective, underperforming, or even exploited, due to the disconnect between research and actual deployment. Furthermore, in cases of hard constraints like privileged data access or strict query budgets, the whole approach might be rendered invalid.</dd>
+            <dt>Recommendations</dt><dd>To ensure practical relevance and transparency we recommend designing evaluations to mirror real-world problems. Realistic deployment settings should be used by constraining observation/action spaces, and enforcing practical limits on query budgets and computation. In cases where such assumptions are unavoidable, ablations should show performance and robustness under constrained and noisy conditions. Finally, every study should include a brief summary of deployment requirements, such as privileges and training budgets.</dd>
+            <dt>Case study</dt><dd><a href="#case-deployment">MiniCAGE (action order)</a></dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pf-dns" hidden data-augmented-ui="tl-clip br-clip border"><h4><span class="hb-code">D-NS</span>Non-Stationarity</h4>
+          <p class="def">The environment does not effectively mitigate the inherent non-stationarity of the underlying cybersecurity task.</p>
+          <dl>
+            <dt>Prevalence</dt><dd>Across the 66 papers reviewed, we found that 23 papers (34.9%) failed to mitigate the inherent non-stationarity of their cybersecurity tasks; 13 papers (19.7%) considered some of the non-stationarity present in the task; and 30 papers (45.5%) did not have, or adequately handled, the non-stationary aspects of their chosen task. The most common unaddressed non-stationarity across the papers was the behavior of other actors in the environment, e.g., assumed fixed attacker in ACD.</dd>
+            <dt>Security implications</dt><dd>In practice, adversaries, network conditions, and software systems evolve continuously; yet agents trained under stationary assumptions learn on fixed dynamics and predictable behavior. Such agents are brittle to change and exploitable in dynamic environments, where they can fail by adopting obsolete strategies, or be manipulated by adversarial tactics. Critically, systems may appear effective under static evaluation providing a false sense of robustness, but perform unreliably, once deployed in the ever-changing landscape of cybersecurity operations.</dd>
+            <dt>Recommendations</dt><dd>Cybersecurity tasks are inherently dynamic, so DRL agents must be explicitly exposed to such variability during training. Environments should be designed for adaptation; for example, non-stationarity can be incorporated through temporal shifts, randomized parameters, evolving topologies, and adaptive adversaries. Additionally, techniques such as curriculum learning, domain randomization, and population-based training can further help agents generalize to progressively hardening conditions. Brittleness, and long-term resilience can then be measured through transfer tests against unseen strategies.</dd>
+            <dt>Case study</dt><dd><a href="#case-deployment">MiniCAGE (attacker strategy)</a></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="psec" id="cases">
+    <h2>Case Study Environments</h2>
+    <div class="prose">
+      <p>We conducted controlled experiments across three DRL4Sec domains to demonstrate the practical impact of the identified pitfalls. For all environments, their full MDP specifications are included in our repositories. To highlight pitfalls we performed didactic case studies, these are intended as illustrative examples where pitfalls have measurable, concrete, consequences in security environments. The specific consequence of a pitfall depends on the security problem, how it is modeled, implemented, algorithm chosen, and numerous other factors.</p>
+    </div>
+
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>MiniCAGE <span class="dom">Autonomous cyber defense</span></h4><p>The enterprise network to be defended comprises 13 hosts across three subnets: a user subnet (5 hosts), an enterprise subnet (3 hosts plus 1 defender host), and an operational subnet (4 hosts including a critical server). The defensive (blue) agent must prevent an attacker (red) from reaching the critical server. MiniCAGE contains two attacker strategies: the B-Line attacker proceeds directly through the network to compromise the critical server as quickly as possible, while the Meander attacker attempts to compromise the entire network while en route to the critical server.</p></div>
+      <div class="card"><h4>AutoRobust <span class="dom">Adversarial malware creation</span></h4><p>In this environment, the agent is presented with a detected malware sample, and must transform it so that it is misclassified. Rather than modifying the executable, the agent operates on a structured behavioral representation extracted from sandbox execution, consisting of system interactions such as file accesses, registry modifications, executed commands, and API usage. At each step, the agent edits or adds report entries to cross the decision boundary while maintaining a plausible behavioral trace.</p></div>
+      <div class="card"><h4>Link <span class="dom">Web security testing: XSS</span></h4><p>The Link DRL agent uses a hand-crafted state-action space to iteratively build XSS payloads. We retrain Link on WAVSEP, a collection of deliberately vulnerable web-applications, following the settings from the original work. WAVSEP contains 32 XSS vulnerabilities.</p></div>
+      <div class="card"><h4>SQIRL <span class="dom">Web security testing: SQL injection</span></h4><p>The SQIRL DRL agent uses embeddings of SQL payloads, and statements to handle a dynamic action space, to generate payloads. We retrain SQIRL on its training benchmark, the SMB, which includes 20 training samples, and 10 testing samples (including 5 reproduced CVEs), following the original training and settings of the work.</p></div>
+    </div>
+
+    <div class="stats two">
+      <div class="stat"><b>10.1%</b><span>increase in the percentage of vulnerabilities found by Link with Distinct States</span></div>
+      <div class="stat"><b>47.4%</b><span>drop in vulnerabilities found for the Combined SQIRL agent on sanitized vulnerabilities</span></div>
+      <div class="stat"><b class="red">−72.7</b><span>score of the blue then red defender when the assumed order changes (zero is the theoretical max)</span></div>
+      <div class="stat"><b>−104.1</b><span>score of the defender trained against B-Line, evaluated against Meander</span></div>
+    </div>
+
+    <h3 id="case-modeling">Case Study of Modeling Pitfalls</h3>
+    <div class="prose">
+      <p>We use the Link XSS payload generation environment to show how modeling decisions impact performance. Although the original environment contains valid Markovian transitions, its design introduces unnecessary partial observability and misalignment with the practical security task. This arises from overlapping features in the state space, whereby multiple XSS payloads can be mapped to identical DRL states. For example, a single feature is used to indicate multiple HTML tags (e.g., <code>img</code>, <code>video</code>, <code>audio</code> or <code>svg</code> tags). The unintentional pitfalls introduced by this design can be rectified through reformulation of the MDP.</p>
+      <p>Thus, we consider two formulations of the MDP for this task: (1) Original, that have merged states; (2) Distinct States, that unrolls the conflated payload features into distinct values, increasing the state dimensionality by 12.8% from 47, to 53.</p>
+    </div>
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Table 1: Link on WAVSEP</p>
+        <p class="chart-sub">Percent of vulnerabilities found (VF%) and 95% CI results for Link over 20 runs demonstrating the impact of modeling choices.</p>
+      </figcaption>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>MDP</th><th class="n">VF (%)</th><th class="n">95% CI</th></tr></thead>
+        <tbody>
+          <tr><td>Original</td><td class="n">75.2</td><td class="n">(59.4, 90.9)</td></tr>
+          <tr class="hl"><td>Distinct States</td><td class="n">85.3</td><td class="n">(76.7, 94.0)</td></tr>
+        </tbody>
+      </table></div>
+      </figure>
+    <div class="prose">
+      <p><strong>Modeling Correctness &amp; Partial Observability.</strong> Introducing Distinct States for each possible payload aligns the MDP with the underlying security task avoiding M-MC. Therefore, the agent can develop correct payloads by selecting actions and observing the distinct impact they have on the current payload. Thus, removing the unnecessary partial observability, M-PO, from the environment. This effect can be observed concretely in Table 1 where including Distinct States increases the percentage of vulnerabilities found over Original by 10.1% and the raising lower bound performance by 17.3%. Therefore, through minor changes in the state space to remove the M-MC and M-PO pitfalls, we can observe significant improvements in performance.</p>
+      <p><strong>MDP Specification.</strong> Although originally defined clearly, the performance difference between MDP formulations in Table 1 demonstrates that when components are left unclear, MDP Specification can severely impact final performance.</p>
+    </div>
+
+    <h3 id="case-training">Case Study of Training Pitfalls</h3>
+    <div class="prose">
+      <p>To evaluate the impact of pitfalls in policy training, we use MiniCAGE. Specifically, we evaluate four hyperparameter settings for T-HR, investigate variance and convergence for T-VA and T-PC, respectively.</p>
+    </div>
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Hyperparameter settings in MiniCAGE</p>
+        <p class="chart-sub">The four PPO settings whose training curves (20 runs each, 95% CI) the paper plots, and what it reports for each.</p>
+      </figcaption>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Setting</th><th>What changes</th><th>At 2.5 million steps</th></tr></thead>
+        <tbody>
+          <tr><td>Default HPs</td><td>Stable Baselines 3 defaults for PPO</td><td>Relative convergence at 2.0–2.5M steps, minor variance</td></tr>
+          <tr><td>Alt Clipping</td><td>PPO’s loss clipping</td><td>Relative convergence at 2.0–2.5M steps, minor variance</td></tr>
+          <tr><td>Alt Learning Rate</td><td>Learning rate</td><td>Still increasing, higher variance</td></tr>
+          <tr><td>Alt Discount Factor</td><td>Discount factor for future rewards</td><td>Still increasing, higher variance</td></tr>
+        </tbody>
+      </table></div>
+      </figure>
+    <div class="prose">
+      <p><strong>Impact of Hyperparameters.</strong> We examine the final performance at 2.5 million steps and see how changing a single hyperparameter results in drastically different performance, highlighting how hyperparameter transparency is needed to ensure reproducibility.</p>
+      <p><strong>Analyzing Variance.</strong> Concretely, at 500k the upper CI bound of the ‘Alt Learning Rate’ appears to be the second best performing agent. However, we see from the variance that an agent at this upper CI bound is not representative of the (lower) mean performance. By evaluating over multiple runs and reporting 95% CI, we obtain a more accurate picture of actual performance.</p>
+      <p><strong>Demonstrating Policy Convergence.</strong> The ‘Default HPs’ and ‘Alt Clipping’ settings show relative convergence at 2.0-2.5 million steps where plateauing performance curves and minor variance can be seen. In contrast, the ‘Alt Learning Rate’ and ‘Alt Discount Factor’ are still increasing in performance with higher variance at 2.5 million steps.</p>
+    </div>
+
+    <h3 id="case-evaluation">Case Study of Evaluation Pitfalls</h3>
+    <div class="prose">
+      <p>Here we consider the three pitfalls we identified in evaluating agents: first, the attribution of gains in the AutoRobust environment; second, the theoretical motivation of DRL in adversarial malware generation; third, environment complexity comparisons in the SQIRL environment for SQL injection.</p>
+      <p><strong>Identifying the Source of Gains.</strong> To assess the impact of the E-GA pitfall, the goal in the AutoRobust environment is to disentangle the contributions of different elements in the approach. First, we train and evaluate policies with full access to the internal state of the malware detection model, referred to as MDP. Second, we consider policies without internal state access, named POMDP, to evaluate the performance of learning under a more restrictive and realistic threat model. Finally, we evaluate Random policies that sample actions at random, to isolate the intrinsic efficacy of the action space itself. There are two key takeaways. First, full observability does not guarantee better performance, as agents can struggle to learn the task even with fully observable information. Second, while trained policies (MDP &amp; POMDP) have the potential to achieve better performance, the random baseline is already strong. This demonstrates the importance of E-GA as the action space alone provides a large portion of overall performance.</p>
+      <p><strong>Motivating the Application.</strong> As an example of theoretical motivation, in the domain of adversarial malware creation, DRL has several key capabilities over existing gradient-based attacks. Concretely, gradient-based methods assume a fixed input size, limiting exploration to only a very small subset of the actual transformations an adversary can make. Similarly in malware, gradient-based perturbations on the feature representation do not have a consistent and reliable method for being mapped to valid changes in the problem-space, i.e., the actual program. In contrast, DRL can operate directly on malware samples, bypassing the need for feature to problem-space mapping. Furthermore, given an adversary with a well defined sets of actions, at convergence DRL can additionally confer probabilistic guarantees on the level of vulnerability/robustness.</p>
+      <p><strong>Changing Environment Complexity.</strong> To show the effect of E-EC we use the SMB benchmark from SQIRL. Using the SMB we train two policies, one on the default SMB with a Combined sanitized and non-sanitized vulnerability set, and one policy with the same vulnerabilities without sanitization (Non-Sanitized). We evaluate both trained policies on the SMB test set of sanitized and non-sanitized vulnerabilities; Table 2 shows the percentage of vulnerabilities found across 20 runs with 95% CI.</p>
+    </div>
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Table 2: SQIRL on the SMB</p>
+        <p class="chart-sub">Percent of vulnerabilities found (VF%) and 95% CI for SQiRL across 20 runs and evaluations each setting. Showing the impact of evaluating on low-complexity environments.</p>
+      </figcaption>
+      <p class="tbl-sub">Training environment (rows) against evaluation environment (columns)</p>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Training environment</th><th class="n">Sanitized</th><th class="n">Non-Sanitized</th></tr></thead>
+        <tbody>
+          <tr><td>Combined</td><td class="n">41.10<span class="ci">(33.9, 48.4)</span></td><td class="n">88.5<span class="ci">(85.4, 91.6)</span></td></tr>
+          <tr><td>Non-Sanitized</td><td class="n">29.80<span class="ci">(22.9, 36.8)</span></td><td class="n">88.7<span class="ci">(85.5, 91.9)</span></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chart-foot"><span>VF (%) with 95% CI.</span></div>
+    </figure>
+    <div class="prose">
+      <p>We see both the Combined and Non-Sanitized agents are capable of discovering vulnerabilities in the simplified non-sanitized settings. However, when changing the evaluation set to the more challenging Sanitized vulnerabilities we see a 47.4% drop in vulnerabilities found for the Combined agent, with a further 11.3% for the non-sanitized agent. This demonstrates how simplified evaluation environments can inflate performance, producing promising results that fail to translate into real-world capabilities.</p>
+    </div>
+
+    <h3 id="case-deployment">Case Study of Deployment Pitfalls</h3>
+    <div class="prose">
+      <p>We evaluate the impact of pitfalls in deploying DRL agents using MiniCAGE. First, we consider Underlying Assumptions by modifying the assumed fixed action order between attacker and defender during testing, blue then red (B→R) in the original formulation. Second, we study Non-Stationarity by changing the fixed attacker strategy between training and testing.</p>
+    </div>
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Table 3: MiniCAGE deploying agents</p>
+        <p class="chart-sub">Experimental results for MiniCAGE deploying agents case study. The top section shows blue agent performance when training and evaluation action orders differ. The bottom section shows blue agent performance against different red adversaries. Zero is the theoretical max score.</p>
+      </figcaption>
+      <p class="tbl-sub">Training order (rows) against evaluation order (columns)</p>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Training order</th><th class="n">R→B</th><th class="n">B→R</th><th class="n">Mixed</th></tr></thead>
+        <tbody>
+          <tr><td>R→B</td><td class="n diag">−15.8<span class="ci">(−14.8, −16.7)</span></td><td class="n">−21.0<span class="ci">(−19.0, −23.1)</span></td><td class="n">−18.3<span class="ci">(−17.0, −19.6)</span></td></tr>
+          <tr><td>B→R</td><td class="n">−72.7<span class="ci">(−65.6, −79.9)</span></td><td class="n diag">−17.2<span class="ci">(−16.7, −17.7)</span></td><td class="n">−45.5<span class="ci">(−42.0, −49.0)</span></td></tr>
+          <tr><td>Mixed</td><td class="n">−28.4<span class="ci">(−25.6, −31.2)</span></td><td class="n">−19.9<span class="ci">(−19.2, −20.6)</span></td><td class="n diag">−24.6<span class="ci">(−22.9, −26.2)</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="tbl-sub">Training red agent (rows) against evaluation adversary (columns)</p>
+      <div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Training red agent</th><th class="n">B-line</th><th class="n">Meander</th><th class="n">Mixed</th></tr></thead>
+        <tbody>
+          <tr><td>B-line</td><td class="n diag">−19.0<span class="ci">(−20.9, −17.2)</span></td><td class="n">−104.1<span class="ci">(−120.7, −87.6)</span></td><td class="n">−61.4<span class="ci">(−70.5, −52.3)</span></td></tr>
+          <tr><td>Meander</td><td class="n">−79.0<span class="ci">(−97.2, −60.9)</span></td><td class="n diag">−61.0<span class="ci">(−74.7, −47.3)</span></td><td class="n">−70.2<span class="ci">(−83.5, −56.9)</span></td></tr>
+          <tr><td>Mixed</td><td class="n">−40.2<span class="ci">(−47.1, −33.4)</span></td><td class="n">−79.2<span class="ci">(−86.5, −71.9)</span></td><td class="n diag">−60.2<span class="ci">(−65.8, −54.7)</span></td></tr>
+        </tbody>
+      </table></div>
+      <div class="chart-foot"><span>Score with 95% CI; bold where training and evaluation match.</span></div>
+    </figure>
+    <div class="prose">
+      <p><strong>Breakdown of Underlying Assumption.</strong> The first section of Table 3 shows the average reward of the DRL defender when varying the action order of red and blue agents in training and testing (e.g., R→B indicates red then blue and Mixed indicates random turn order). As expected, agents perform comparably when tested on the same training order (−17.2 for B→R and −15.8 for R→B). When the assumed order changes, performance degrades: minimally for R→B agent (−21.0) and drastically for the B→R agent (−72.7). These results highlight how minor design choices can degrade performance if the assumptions they rely on do not hold in practice.</p>
+      <p><strong>Changing Attacker Strategy.</strong> Table 3 shows the average reward of defender agents under varying attacker strategies: B-Line and Meander. The agent order is kept constant as B→R. We see a degradation in performance when any stationary blue agent is evaluated against unseen or mixed attacker strategies. This degradation can be mitigated by including non-stationary attacker strategies during training as the Mixed blue agent outperforms the stationary defenders in both mixed and cross evaluations. These results show that policies can be brittle to changing conditions when trained without accounting for non-stationarity.</p>
+    </div>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Open Science</span><p>To support open science and promote reproducibility, we provide the following repositories. <a href="https://github.com/alan-turing-institute/DRL4Sec-Pitfalls">GitHub</a> and <a href="https://doi.org/10.5281/zenodo.20209122">Zenodo</a>. Each case study directory contains the modified environment, the training/evaluation scripts, the MDP specification, and a <code>case_study.diff</code> documenting all changes from the original open-source repository released with their respective papers. The full reproduction of 20 seeds is computationally-intensive, therefore, we recommend running a single seed.</p></div>
+  </section>
+
+  <section class="psec" id="recommendations">
+    <h2>Actionable Recommendations</h2>
+    <div class="prose">
+      <p>We encourage researchers to carefully consider the pitfalls of DRL for cybersecurity and, where applicable, apply the recommendations from this work.</p>
+    </div>
+    <ul class="checklist">
+      <li class="stage-row"><span class="stage">Environment modeling</span></li>
+      <li><span class="hb-code">M-MS</span><span><strong>MDP Specification.</strong> Crucially, assumptions, approximations, or simplifications must be explicitly discussed. When space constraints prevent full specification in the main text, this should be provided in appendices or supplementary materials.</span></li>
+      <li><span class="hb-code">M-MC</span><span><strong>Modeling Correctness.</strong> The state transitions must reflect genuine sequential structure (next states are consequences of current state and action) rather than artificially chaining independent decisions.</span></li>
+      <li><span class="hb-code">M-PO</span><span><strong>Partial Observability.</strong> Partial observability may be inherent to security tasks which often feature incomplete, delayed, or deliberately concealed information. In such cases it should be explicitly formulated as a POMDP.</span></li>
+      <li class="stage-row"><span class="stage">Agent training</span></li>
+      <li><span class="hb-code">T-HR</span><span><strong>Hyperparameter Reporting.</strong> Complete hyperparameter reporting is necessary for reproducible, trustworthy research in cybersecurity as DRL algorithms are highly sensitive to hyperparameter choices.</span></li>
+      <li><span class="hb-code">T-VA</span><span><strong>Variance Analysis.</strong> We recommend a minimum of N ≥ 5, and encourage higher runs (N ≥ 20 or N ≥ 50) for stronger statistical claims.</span></li>
+      <li><span class="hb-code">T-PC</span><span><strong>Policy Convergence.</strong> We recommend the inclusion of figures showing episodic reward or task-specific metrics as clear evidence of stabilization before training termination.</span></li>
+      <li class="stage-row"><span class="stage">Performance evaluation</span></li>
+      <li><span class="hb-code">E-AM</span><span><strong>Application Motivation.</strong> Applying DRL to a novel task should be justified theoretically and, when possible, empirically.</span></li>
+      <li><span class="hb-code">E-GA</span><span><strong>Gain Attribution.</strong> Evaluating performance under random action sampling isolates the contribution of policy learning and establishes a baseline performance in the environment.</span></li>
+      <li><span class="hb-code">E-EC</span><span><strong>Environment Complexity.</strong> As a result of transferability issues from the sim-to-real gap, it is best practice to train and evaluate DRL in the most realistic environment feasible.</span></li>
+      <li class="stage-row"><span class="stage">System deployment</span></li>
+      <li><span class="hb-code">D-UA</span><span><strong>Underlying Assumptions.</strong> Realistic deployment settings should be used by constraining observation/action spaces, and enforcing practical limits on query budgets and computation.</span></li>
+      <li><span class="hb-code">D-NS</span><span><strong>Non-Stationarity.</strong> Cybersecurity tasks are inherently dynamic, so DRL agents must be explicitly exposed to such variability during training.</span></li>
+    </ul>
+  </section>
+
+  <section class="psec" id="conclusion">
+    <h2>Conclusion</h2>
+    <div class="prose">
+      <p>The autonomous and adaptive decision-making that DRL can offer in complex environments has significant potential for cybersecurity applications. However, our review of 66 DRL4Sec papers published between 2018-2025 reveals 11 common methodological challenges (pitfalls) that undermine DRL4Sec research. Through case studies in autonomous cyber defense, adversarial malware creation, and web security testing, we demonstrate these pitfalls directly impact performance and create potentially brittle policies.</p>
+    </div>
+    <ul class="takeaways">
+      <li><span><strong>Prevalence Analysis.</strong> We systematically examine 66 DRL4Sec papers published between 2018 and 2025, quantifying the occurrence and severity of pitfalls across diverse security domains.</span></li>
+      <li><span><strong>Pitfall Taxonomy.</strong> We define 11 pitfalls when adapting DRL to cybersecurity, organized across four stages of development (modeling, training, evaluation, and deployment).</span></li>
+      <li><span><strong>Impact Demonstration.</strong> Through experiments using existing DRL4Sec environments in three representative domains, we provide empirical evidence of the impact caused by these pitfalls.</span></li>
+      <li><span><strong>Actionable Recommendations.</strong> We provide concrete guidance to mitigate each pitfall, supporting the development of more rigorous and reliable DRL4Sec research.</span></li>
+    </ul>
+    <div class="prose">
+      <p>Through the identification of 11 DRL4Sec pitfalls and recommendations for their mitigation, this work establishes higher methodological standards for future applications of DRL to cybersecurity.</p>
+    </div>
+  </section>
+</Paper>
+
+<style is:global>
+  .psec h3[id] { scroll-margin-top: 80px; }
+  .ex-panel .def { color: var(--bone); }
+  .ex-panel dd a { color: var(--bone); text-decoration-color: var(--red); text-underline-offset: 3px; }
+  .ex-panel dd a:hover { color: var(--red); }
+  .data-table .ci { display: block; font-size: 11.5px; color: var(--ash); font-weight: 400; }
+  .data-table td.diag { color: var(--bone); font-weight: 600; }
+  .data-table td.diag .ci { font-weight: 400; }
+  .tbl-sub { font-family: var(--f-term); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ash); margin: 22px 0 0; }
+  .checklist { list-style: none; margin: 24px 0; padding: 0; border-top: 1px solid var(--smoke); }
+  .checklist li { display: grid; grid-template-columns: 4.25rem minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--smoke); font-size: 15.5px; line-height: 1.55; color: var(--bone); }
+  .checklist .hb-code { color: var(--red); margin: 0; padding-top: 2px; }
+  .checklist strong { color: var(--bone); font-weight: 650; }
+  .checklist .stage { display: block; font-family: var(--f-term); font-size: 10.5px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--ash); padding: 18px 0 6px; border-bottom: 1px solid var(--smoke); }
+  .checklist li.stage-row { display: block; padding: 0; border-bottom: 0; }
+  @media (max-width: 420px) { .data-table .ci { font-size: 10.5px; } }
+  .card h4.red { color: var(--red); }
+  .card h4 .dom { display: block; margin-top: 2px; font-size: 13.5px; font-weight: 500; color: var(--ash); }
+  .ex-panel h4 .hb-code { font-size: 13px; color: var(--red); vertical-align: 3px; }
+  .stats.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stats.two .stat:nth-child(odd) { padding-left: 0; }
+  .stats.two .stat:nth-child(even) { border-right: 0; padding-left: 20px; }
+  .stats.two .stat:nth-child(-n+2) { border-bottom: 1px solid var(--smoke); }
+  @media (max-width: 560px) { .stats.two { grid-template-columns: minmax(0, 1fr); } .stats.two .stat:nth-child(even) { padding-left: 0; } }
+  .steps > li > div { min-width: 0; }
+  .ex-tab .hb-code { white-space: nowrap; }
+</style>

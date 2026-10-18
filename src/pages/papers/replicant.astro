@@ -1,0 +1,757 @@
+---
+import Paper from '../../layouts/Paper.astro';
+const sections = [
+  { id: 'problem', label: 'Introduction' },
+  { id: 'threat-model', label: 'Threat model' },
+  { id: 'approach', label: 'REPLICANT framework' },
+  { id: 'setup', label: 'Experimental setup' },
+  { id: 'results', label: 'Black-box evasion' },
+  { id: 'transfer', label: 'Transferring policies' },
+  { id: 'hardening', label: 'Adversarial training' },
+  { id: 'takeaways', label: 'Contributions' },
+];
+---
+<Paper id="replicant" affils={['King’s College London', 'The Alan Turing Institute', 'University College London', 'KU Leuven', 'Core64', 'Devotion AI Labs']} sections={sections}>
+  <Fragment slot="abstract">
+    <p>To determine the real-world effectiveness of machine learning based malware detection, it is vital to evaluate its robustness against highly capable adversaries. However, state-of-the-art attacks do not effectively model realistic adversaries, as they often assume access to privileged information such as the training data, feature space, or confidence scores of the target. In this work, we present REPLICANT, a deep reinforcement learning framework that learns the realistic task of evasion under a strict label-only black-box threat model. REPLICANT learns a reusable policy on how to modify a malware sample and when to query the target, which transfers across samples, detectors, and feature spaces. Across seven Android malware detectors and three feature spaces, REPLICANT is the strongest and most query-efficient approach achieving a mean attack success rate of 78.8%, a relative improvement of 20.9%–39.2% over the state-of-the-art. Furthermore, when used for adversarial training, REPLICANT also outperforms the state-of-the art by producing detectors with more generalizable robustness. With REPLICANT we demonstrate that learning the task of evasion not only results in stronger attack performance but, crucially, provides a better signal for hardening malware detectors.</p>
+  </Fragment>
+
+  <section class="psec" id="problem">
+    <h2>Introduction</h2>
+    <div class="prose">
+      <p>Machine Learning (ML) classifiers have become a key line of defence against malware, with extensive research focusing on improving their performance and robustness to drift. However, the field of Adversarial Machine Learning (AML) has repeatedly demonstrated the brittleness of ML-based systems under targeted modifications. Although well established, this vulnerability is often underpinned with strong assumptions, such as access to confidence scores; therefore, the question most relevant for risk assessment is not whether these detectors can be evaded, but how general and efficient an attack can be under realistic constraints.</p>
+      <p>Most evasion research operates in the feature space, directly modifying the input that is fed into ML systems. Although sufficient to evade systems such as image detection, these approaches are not applicable to crafting evasive malware due to the <span class="term">inverse mapping problem</span>: a change to the feature vector does not necessarily correspond to any realizable and function-preserving change in the application. Alternatively, problem-space attacks avoid this problem by modifying the application directly while enforcing syntactical and semantic constraints; therefore, every adversarial example is a valid program by construction.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 640 250" role="img" aria-label="Feature-space attacks flip bits of the feature vector, including removals that may break the malware, and the edited vector may match no real app. Problem-space attacks transplant a benign gadget into the app, giving a valid program whose feature vector only gains ones, with a known effect.">
+        <defs>
+          <marker id="ah-space" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-space-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+
+        <text class="t-mono t-muted" x="20" y="22">FEATURE-SPACE ATTACK</text>
+        <path class="box" d="M32 36H160V94L148 106H20V48Z"/>
+        <text class="t-sm t-muted mid" x="90" y="62">Original sample</text>
+        <text class="t-code mid" x="90" y="86">x = 1 0 1 1 0</text>
+
+        <path class="ln" d="M160 71 H246" marker-end="url(#ah-space)"/>
+        <text class="t-sm t-muted mid" x="205" y="63">flip bits</text>
+
+        <path class="box" d="M262 36H390V94L378 106H250V48Z"/>
+        <text class="t-sm t-muted mid" x="320" y="62">Edited vector</text>
+        <text class="t-code mid" x="320" y="86">x′ = 1 <tspan class="t-red">1</tspan> 1 <tspan class="t-red">0</tspan> 0</text>
+
+        <path class="ln ln-dash" d="M390 71 H476" marker-end="url(#ah-space)"/>
+        <text class="t-sm t-muted mid" x="433" y="63">map back?</text>
+
+        <path class="box-dash" d="M492 36H620V94L608 106H480V48Z"/>
+        <text class="t-b mid" x="550" y="60">No app guaranteed</text>
+        <text class="t-sm t-muted mid" x="550" y="78">removed features</text>
+        <text class="t-sm t-muted mid" x="550" y="94">may break malware</text>
+
+        <text class="t-mono t-red" x="20" y="152">PROBLEM-SPACE ATTACK (THIS PAPER)</text>
+        <path class="box" d="M32 166H160V224L148 236H20V178Z"/>
+        <text class="t-sm t-muted mid" x="90" y="192">Original</text>
+        <text class="t-b mid" x="90" y="214">Malware app</text>
+
+        <path class="ln-red" d="M160 201 H246" marker-end="url(#ah-space-red)"/>
+        <text class="t-sm t-red mid" x="205" y="193">transplant</text>
+        <text class="t-sm t-red mid" x="205" y="219">benign gadget</text>
+
+        <path class="box-red" d="M262 166H390V224L378 236H250V178Z"/>
+        <text class="t-b mid" x="320" y="190">Modified app</text>
+        <text class="t-sm mid" x="320" y="208">valid program,</text>
+        <text class="t-sm mid" x="320" y="224">same behaviour</text>
+
+        <path class="ln" d="M390 201 H476" marker-end="url(#ah-space)"/>
+        <text class="t-sm t-muted mid" x="433" y="193">extract</text>
+        <text class="t-sm t-muted mid" x="433" y="219">features</text>
+
+        <path class="box" d="M492 166H620V224L608 236H480V178Z"/>
+        <text class="t-sm t-muted mid" x="550" y="192">Known effect</text>
+        <text class="t-code mid" x="550" y="214">x′ = 1 <tspan class="t-red">1</tspan> 1 1 0</text>
+      </svg>
+      </div>
+      <figcaption>In the context of the predominantly binary feature spaces of Android malware detection, adding a feature (0 → 1) requires concretely introducing the corresponding code (such as API or permission), while removing a feature (1 → 0) may require removing or breaking functionality that is central to the malware. Problem-space attacks circumvent the inverse-mapping problem by grounding modifications in the program itself, with each transformation mapping actual code to a known feature space effect.</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>Problem-space attacks must meet the following criteria:</p>
+      <ul>
+        <li>(i) available transformations (realizability), using only modifications an attacker could perform in practice;</li>
+        <li>(ii) preserved semantics, the transformations performed must preserve the original malicious behavior of the sample;</li>
+        <li>(iii) plausibility, the sample should appear realistic upon manual inspection;</li>
+        <li>(iv) robustness to preprocessing, the modifications should survive a realistic pre-processing pipeline.</li>
+      </ul>
+      <p>The most established way to satisfy these constraints for problem-space Android malware attacks is <span class="term">gadget extraction and transplantation</span>, where self-contained code fragments alongside their known features are harvested from benign applications and transplanted into malware. As a result of gadgets being harvested from real applications, they are realizable and plausible by construction. Furthermore, since gadget transplantation only adds benign code, and thus features (0 → 1), it preserves the original behavior (semantics) of the malware.</p>
+    </div>
+
+    <h3>Three major limitations</h3>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Per-sample optimization</h4><p>Existing works optimize individual samples against a single target classifier and feature space, relying on confidence scores and search heuristics or greedy selection. As a result, these attacks optimize on a per-sample basis without retaining knowledge from past evasions, capping their query efficiency and limiting their transferability to new targets.</p></div>
+      <div class="card"><h4>Capability set and strategy conflated</h4><p>Existing literature often conflates two separate components of problem-space attacks: (i) the capability set, which defines modifications available to the attacker that can be made while preserving problem-space constraints; and, (ii) the strategy, which selects from the capability set in order to modify a sample to evade a target.</p></div>
+      <div class="card"><h4>A single temporal snapshot</h4><p>These approaches are evaluated only on a single temporal snapshot, ignoring the impact that temporal drift and targets that employ Active Learning (AL) have on the evasion of malware samples.</p></div>
+    </div>
+
+    <div class="prose">
+      <p>We therefore lack a comprehensive understanding of how evasion strategies generalize and transfer across classifiers, feature spaces, and time. To address these limitations, we propose REPLICANT: a unified Deep Reinforcement Learning (DRL) framework that learns problem-space evasion policies.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="threat-model">
+    <h2>Threat Model</h2>
+    <div class="prose">
+      <p>The goal of the attacker is to violate the integrity of the system by modifying malware to be classified as goodware while preserving its malicious behavior. Furthermore, in the process of achieving this goal, the attack aims to minimize the number of both malware modifications and target queries.</p>
+      <p>In the <span class="term">black-box</span> setting, the attacker has no explicit knowledge of the target classifier clf<sub>target</sub> and receives only its predicted label (i.e., either benign or malicious), rather than a confidence score. To learn an evasion policy, the attacker instead uses a surrogate classifier clf<sub>surrogate</sub> created by themselves or others, which is trained on distinctly different data from the target. Therefore, the surrogate may also differ from the target in both classifier architecture or feature space.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 640 340" role="img" aria-label="Threat model. The attacker has a surrogate detector, a capability set of benign gadgets and its own feature space. The target hides its training data, architecture, feature space and confidence scores. The attacker submits modified apps and receives only a benign or malware label, within 20 queries per sample. Prior attacks were designed around white-box access or confidence scores.">
+        <defs>
+          <marker id="ah-threat" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-threat-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+
+        <path class="zone" d="M30 16H236V222L222 236H16V30Z"/>
+        <text class="t-mono t-red" x="32" y="40">ATTACKER HAS</text>
+        <path class="box-plain" d="M42 54H220V94L210 104H32V64Z"/>
+        <text class="t-b" x="44" y="75">Surrogate detector</text>
+        <text class="t-sm t-muted" x="44" y="93">trained on different data</text>
+        <path class="box-plain" d="M42 112H220V152L210 162H32V122Z"/>
+        <text class="t-b" x="44" y="133">Capability set</text>
+        <text class="t-sm t-muted" x="44" y="151">gadgets from benign apps</text>
+        <path class="box-plain" d="M42 170H220V210L210 220H32V180Z"/>
+        <text class="t-b" x="44" y="191">Own feature space</text>
+        <text class="t-sm t-muted" x="44" y="209">sees each gadget's effect</text>
+
+        <path class="zone" d="M418 16H624V222L610 236H404V30Z"/>
+        <text class="t-mono t-muted" x="420" y="40">TARGET HIDES</text>
+        <path class="box-dash" d="M430 52H608V78L598 88H420V62Z"/>
+        <text class="t-muted mid" x="514" y="75">Training data</text>
+        <path class="box-dash" d="M430 96H608V122L598 132H420V106Z"/>
+        <text class="t-muted mid" x="514" y="119">Model architecture</text>
+        <path class="box-dash" d="M430 140H608V166L598 176H420V150Z"/>
+        <text class="t-muted mid" x="514" y="163">Feature space</text>
+        <path class="box-dash" d="M430 184H608V210L598 220H420V194Z"/>
+        <text class="t-muted mid" x="514" y="207">Confidence scores</text>
+
+        <path class="ln-red" d="M236 100 H400" marker-end="url(#ah-threat-red)"/>
+        <text class="t-sm t-red mid" x="320" y="90">submit modified app</text>
+        <path class="ln" d="M404 146 H240" marker-end="url(#ah-threat)"/>
+        <text class="t-sm t-muted mid" x="320" y="166">label: benign / malware</text>
+        <text class="t-code t-red mid" x="320" y="204">≤ 20 queries</text>
+        <text class="t-sm t-muted mid" x="320" y="222">per malware sample</text>
+
+        <text class="t-mono t-muted" x="16" y="266">PRIOR ATTACKS WERE BUILT TO USE</text>
+        <path class="box" d="M26 278H210V316L200 326H16V288Z"/>
+        <text class="t-b mid" x="113" y="298">APG (white-box)</text>
+        <text class="t-sm t-muted mid" x="113" y="315">greedy, ranks by model score</text>
+        <path class="box" d="M233 278H417V316L407 326H223V288Z"/>
+        <text class="t-b mid" x="320" y="298">AdvDroidZero (gray-box)</text>
+        <text class="t-sm t-muted mid" x="320" y="315">search guided by confidence</text>
+        <path class="box" d="M440 278H624V316L614 326H430V288Z"/>
+        <text class="t-b mid" x="527" y="298">EvadeDroid (gray-box)</text>
+        <text class="t-sm t-muted mid" x="527" y="315">greedy, guided by confidence</text>
+      </svg>
+      </div>
+      <figcaption>The attacker has a capability set: a finite collection of modifications that can be applied to a malware sample while preserving its behavior, each with an observable effect on the feature representation used by the attacker. We compare against three state-of-the-art problem-space Android malware evasion attacks, which all optimize samples individually: (i) APG, white-box greedy capability selection by score contribution; (ii) AdvDroidZero (ADZ), gray-box tree search over a perturbation set using model confidence; and, (iii) EvadeDroid (EvD), gray-box greedy random capability selection that only keeps modifications that reduce target confidence.</figcaption>
+    </figure>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Attacker Parity</span><p>To fairly compare attacks, we evaluate prior attack baselines with the same capability set and threat model as REPLICANT. In the black-box attack settings, all privileged information is drawn from the surrogate, and the target only provides predicted labels when queried. By eliminating the confounding factor of differing capability sets, this allows our evaluation to isolate the performance differences between attack strategies.</p></div>
+
+    <div class="prose">
+      <p>In the <span class="term">white-box</span> setting, the attacker has unrestricted access to the target and thus may use its confidence scores and feature-space representation. We adopt the white-box threat model for the adversarial training (AT) experiments for the following reasons. First, a defender hardening their own model has complete access to it and thus would use the strongest realistic attacker available to them. Second, isolating the robustness gained from AT is best measured using white-box attacks as adding black-box constraints conflates robustness with the difficulty of finding an evasive strategy without access to the target.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="approach">
+    <h2>REPLICANT Framework</h2>
+    <div class="prose">
+      <p>Evasion here is formulated as a sequential decision-making problem (specifically, a <span class="term">Markov Decision Process</span>) where an agent observes the current representation of a modified malware sample and chooses either: (i) to submit the sample to the target; or, (ii) to modify the sample and select which capability to apply. Since each capability corresponds to a concrete problem-space modification whose effect on the feature space is known in advance, we can model and evaluate the MDP in the feature space while maintaining the problem-space realizability of every transition.</p>
+      <p>Hierarchical DRL splits a policy across different levels of abstraction, where a higher-level policy decides what to do next and a lower-level policy decides how to do it. The hierarchical action space of REPLICANT is split across two separate policies: the higher-level <strong>query policy</strong> and the lower-level <strong>modify policy</strong>. Based on s<sub>t</sub>, REPLICANT first selects a query action, q<sub>t</sub> ∈ {'{'}SUBMIT, MODIFY{'}'}. If q<sub>t</sub> = SUBMIT then the classifier is queried, clf(s<sub>t</sub>) ∈ {'{'}0, 1{'}'}, and no capabilities are applied. If q<sub>t</sub> = MODIFY, then the modify policy selects a capability to apply to the malware sample and does not query the classifier. <span class="term">Action masking</span> removes, prior to selection, any modify action whose capability either: (i) adds no new features (a no-op), or (ii) would conflict in the problem space.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 640 372" role="img" aria-label="The REPLICANT MDP. The agent observes the feature vector of the current sample. Its query policy chooses MODIFY or SUBMIT. MODIFY passes to the modify policy, which picks an allowed gadget from the masked capability set; the gadget is applied to the sample at a reward of minus one. SUBMIT queries the black-box target: a benign label ends the episode with reward plus H, a malware label costs minus one and the agent continues. Query rules: submit needs a new gadget, forced submits every 10 steps in training, an episode cap of 100 steps, and a 20-query budget at test time.">
+        <defs>
+          <marker id="ah-mdp" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-mdp-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+
+        <path class="box-dash" d="M228 16H378V232L362 248H212V32Z"/>
+        <text class="t-mono t-red" x="222" y="240">AGENT</text>
+
+        <path class="box-solid" d="M232 30H370V88L358 100H220V42Z"/>
+        <text class="t-mono t-on-red mid" x="295" y="58">MODIFY POLICY</text>
+        <text class="t-on-red mid" x="295" y="80">which gadget?</text>
+
+        <path class="box-solid" d="M232 152H370V212L358 224H220V164Z"/>
+        <text class="t-mono t-on-red mid" x="295" y="180">QUERY POLICY</text>
+        <text class="t-on-red mid" x="295" y="202">submit or modify?</text>
+
+        <path class="ln-red" d="M295 152 V104" marker-end="url(#ah-mdp-red)"/>
+        <text class="t-sm t-red" x="303" y="132">MODIFY</text>
+
+        <path class="box" d="M32 152H160V212L148 224H20V164Z"/>
+        <text class="t-mono t-muted mid" x="90" y="176">STATE</text>
+        <text class="mid" x="90" y="198">feature vector</text>
+        <text class="t-sm t-muted mid" x="90" y="214">of current sample</text>
+
+        <path class="ln" d="M160 188 H216" marker-end="url(#ah-mdp)"/>
+        <text class="t-sm t-muted mid" x="186" y="180">observe</text>
+
+        <path class="box" d="M462 30H620V88L608 100H450V42Z"/>
+        <text class="t-mono t-muted mid" x="535" y="52">CAPABILITY SET</text>
+        <text class="t-sm mid" x="535" y="72">gadgets from benign apps</text>
+        <text class="t-sm t-muted mid" x="535" y="88">no-ops, conflicts masked</text>
+        <path class="ln" d="M450 65 H374" marker-end="url(#ah-mdp)"/>
+        <text class="t-sm t-muted mid" x="414" y="57">allowed</text>
+
+        <path class="ln-red" d="M220 65 H90 V148" marker-end="url(#ah-mdp-red)"/>
+        <text class="t-sm t-red mid" x="150" y="57">apply gadget</text>
+        <text class="t-sm t-muted" x="98" y="112">r = −1</text>
+
+        <path class="box-dash" d="M432 134H620V232L608 244H420V146Z"/>
+        <text class="t-mono t-muted" x="432" y="156">QUERY RULES</text>
+        <text class="t-sm" x="432" y="176">submit needs a new gadget</text>
+        <text class="t-sm" x="432" y="196">train: submit every 10 steps</text>
+        <text class="t-sm" x="432" y="216">episode cap: H = 100 steps</text>
+        <text class="t-sm" x="432" y="236">test: 20-query budget</text>
+
+        <path class="ln-red" d="M295 224 V286" marker-end="url(#ah-mdp-red)"/>
+        <text class="t-sm t-red" x="303" y="266">SUBMIT</text>
+        <path class="box" d="M232 290H370V348L358 360H220V302Z"/>
+        <text class="t-mono t-muted mid" x="295" y="316">TARGET DETECTOR</text>
+        <text class="mid" x="295" y="340">label only</text>
+
+        <path class="ln" d="M370 312 H466" marker-end="url(#ah-mdp)"/>
+        <text class="t-sm t-muted mid" x="418" y="304">0: benign</text>
+        <path class="box-red" d="M482 290H620V348L608 360H470V302Z"/>
+        <text class="t-mono t-red mid" x="545" y="312">EVADED</text>
+        <text class="mid" x="545" y="332">episode ends</text>
+        <text class="t-code mid" x="545" y="350">r = +H</text>
+
+        <path class="ln" d="M220 338 H90 V228" marker-end="url(#ah-mdp)"/>
+        <text class="t-sm t-muted mid" x="155" y="330">1: malware</text>
+        <text class="t-sm t-muted mid" x="155" y="354">r = −1, keep going</text>
+      </svg>
+      </div>
+      <figcaption>The episode terminates when the step count reaches the horizon H (max steps per episode) or a query evades the classifier. Masking is also applied to the query policy: (i) MODIFY is masked every p steps during training (p = 10), forcing periodic submits, to ensure the agent receives feedback from the classifier throughout training episodes; and (ii) SUBMIT is masked until at least one modification has occurred since the last query.</figcaption>
+    </figure>
+
+    <h3>Reward Function</h3>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>R<sub>success</sub> = H</h4><p>R<sub>success</sub> ≫ 0 rewards successful evasion.</p></div>
+      <div class="card"><h4>R<sub>detected</sub> = −1</h4><p>R<sub>detected</sub> ≤ 0 penalizes detection.</p></div>
+      <div class="card"><h4>R<sub>modify</sub> = −1</h4><p>R<sub>modify</sub>(s<sub>t</sub>, c<sub>m<sub>t</sub></sub>) &lt; 0 penalizes each capability applied.</p></div>
+    </div>
+
+    <div class="prose">
+      <p>The relative magnitudes of these three terms determine the trade-offs between modification and query efficiency learned by the agent. These values were chosen to: (i) ensure every successful episode has a positive return, since the total penalties over an episode of at most H steps cannot surpass R<sub>success</sub>; and (ii) incentivize an efficient but balanced use of both modifications and queries.</p>
+      <p>During training, the query policy is masked to force periodic submits (PS). We scale the reward of these forced submits by λ<sub>PS</sub> ∈ [0, 1]. We set λ<sub>PS</sub> = 0 for two reasons. First, early in training the agent is usually detected when it queries and can learn to avoid querying altogether; making these periodic queries zero-cost encourages it to explore querying. Second, once the agent is more capable, λ<sub>PS</sub> = 0 encourages the agent to voluntarily submit early to maximize reward.</p>
+    </div>
+
+    <h3>REPLICANT Agent</h3>
+    <div class="prose">
+      <p>A shared MLP encoder feeds three heads, each adding one further layer before its output: a query head over {'{'}SUBMIT, MODIFY{'}'}, a masked modify head over the capability set C, and a critic head estimating state value V(s<sub>t</sub>). Training uses Proximal Policy Optimization (PPO), with the query policy loss applied at every step; the modify policy loss applied only on MODIFY steps, relying on the evasion reward being propagated through advantage estimation; and the critic is shared across both. The query and modify heads share a common entropy coefficient, encouraging exploration over both when to query and what to add.</p>
+    </div>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">A policy, not a sample</span><p>Because training yields a policy π<sub>θ</sub> rather than a fixed adversarial sample, what REPLICANT learns is not bound to a single input or target: the same π<sub>θ</sub> can be used to evade malware it has never seen and transfers to classifiers and feature spaces it was never trained against.</p></div>
+  </section>
+
+  <section class="psec" id="setup">
+    <h2>Experimental Setup</h2>
+    <div class="cards two" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Hypercube dataset, 2021–2024</h4><p>In our experiments we use the Hypercube Android malware dataset, spanning 224,965 samples from 2021–2024, constructed to follow the current best practices for unbiased dataset creation: sampling from a single market (Google Play) using publication timestamps, at a statistically representative size, with a realistic malware distribution of 10% and a VirusTotal Threshold of two (VTT2).</p></div>
+      <div class="card"><h4>Seven classifiers</h4><p>We evaluate against the following seven classifiers: Linear SVM, SecSVM, Random Forest, DeepDrebin, RAMDA, HCC, and <a href="/papers/drmd/">DRMD</a>. We chose these seven classifiers because they span a diverse set of design principles, from margin maximization and ensemble voting to reconstruction, contrastive, and reward-weighted losses.</p></div>
+      <div class="card"><h4>Three feature spaces</h4><p>In total, the Drebin, APIGraph, and RAMDA feature spaces contain 10,000, 11,912, and 379 features, respectively. We chose these three spaces for their differing sizes and overlap, which allow us to evaluate transferability across varying degrees of alignment between the surrogate and target feature spaces.</p></div>
+      <div class="card"><h4>Training sets: two periods, ten seeds</h4><p>We repeat every experiment: (i) over ten random seeds to account for variance; and (ii) over two temporally distinct training periods (2021 &amp; 2022) to avoid bias from temporal luck. For each seed, we perform a random stratified split to produce two equal sized training sets per training year: split a trains the surrogate and REPLICANT policies, and split b trains the target (e.g., 2021a-vs-2021b and 2022a-vs-2022b).</p></div>
+      <div class="card"><h4>Testing sets: the year after training</h4><p>We evaluate attack performance using malware from the year after target training (e.g., 2023 for a 2022b target); which realistically mimics evasion by malware authors as they attempt to evade deployed detectors over time. For each seed and feature space, the evasion test set is the malware that every classifier correctly detects ensuring that differences in ASR reflect the attack rather than which malware each classifier happens to detect.</p></div>
+      <div class="card"><h4>Metrics: ASR and AvgQ</h4><p>We report ASR, specifically the percentage of malware that evaded detection at a fixed per sample budget of twenty queries, as our primary metric. We also report the average number of queries per sample (AvgQ) as a secondary metric for attacks to measure query-efficiency.</p></div>
+    </div>
+
+    <h3>Capability Set</h3>
+    <div class="prose">
+      <p>REPLICANT is deliberately agnostic to what the problem-space capabilities are: it learns effective evasion policies given any capability set and a representation that captures how the modifications affect the sample. Our capability set comprises gadgets harvested by prior problem-space work, together with their feature-space effects we computed. Each gadget affects only a small set of features, so for each feature space we use the subset that changes at least one of its features, resulting in 3,143 for Drebin, 4,804 for APIGraph, and 1,739 for RAMDA. For cross-feature-space attacks, the attacker selects from the capability set applicable in their own feature space, and the target sees the effect of applying those gadgets in its own feature space.</p>
+    </div>
+    <div class="compare" data-augmented-ui="tl-clip br-clip border">
+      <div>
+        <h4>Prior attacks</h4>
+        <ul>
+          <li>When both components are proposed together and not evaluated in isolation, it is unclear if the new attack has discovered a better strategy for evasion, or if a potentially sub-optimal strategy is being carried by a stronger capability set.</li>
+          <li>This ambiguity is a form of the <a href="/papers/sok/">gain attribution pitfall</a>.</li>
+        </ul>
+      </div>
+      <div class="pick">
+        <h4>This evaluation</h4>
+        <ul>
+          <li>All attacks are performed under the same threat model and capability set for each setting, to ensure reported differences reflect attack strategy rather than access to different capabilities.</li>
+          <li>We also evaluate Rnd, which uses the REPLICANT framework but selects actions uniformly at random, to isolate the performance gains of policy learning.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="footnote">The ASRs we report are relative to the capability set and dataset used rather than an absolute upper bound on problem-space evasion.</p>
+  </section>
+
+  <section class="psec" id="results">
+    <h2>Black-Box Evasion</h2>
+
+    <div class="stats quad">
+      <div class="stat"><b class="red">78.8%</b><span>of malware evaded within twenty queries, across all 1,764 settings</span></div>
+      <div class="stat"><b>20.9%–39.2%</b><span>improvement, beating every Android baseline by 13.6–22.2 points</span></div>
+      <div class="stat"><b>7.4</b><span>average queries per sample across all settings, versus the 9.3 of APG</span></div>
+      <div class="stat"><b>96.6%</b><span>mean ASR in the matched setting, using an average of 3.6 queries per sample</span></div>
+    </div>
+
+    <h3>Matched Setting</h3>
+    <div class="prose">
+      <p>In the <strong>matched setting</strong>, the surrogate and target classifiers share an architecture and feature space but are trained on separate training sets; with no difference between architecture or feature space, this setting represents the best-case scenario for a black-box attacker. REPLICANT achieves a mean ASR of 96.6% using an average of 3.6 queries per sample. The strongest baseline, APG, reaches only 77.7% while the ADZ, EvD, and random baselines sit at 61.5%–69.7%. APG is statistically tied with REPLICANT on SVM, SecSVM and DeepDrebin, where ranking capabilities by their contribution to the surrogate decision function most closely aligns with the target boundary. The gap is largest on the RL-based DRMD, where APG collapses to 25.2% against the 90.2% of REPLICANT, followed by RAMDA and RF (35.4 &amp; 27.6 points), with every other baseline statistically beaten on every target.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Matched setting: REPLICANT against APG on each detector</p>
+        <p class="chart-sub">Mean ASR (%) within 20 queries, averaged over feature spaces and seeds. Higher is better for the attacker.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>REPLICANT</span><span><i class="sw-n"></i>APG (strongest baseline)</span></div>
+      <div class="hb" role="list" style="--max:100; --label-w:7rem">
+        <div class="hb-group" aria-hidden="true">SVM</div>
+        <div class="hb-row" role="listitem" data-tip="SVM|REPLICANT: 99.1% ± 1.5" aria-label="SVM, REPLICANT: 99.1%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:99.1"></span></span><span class="hb-val hi">99.1</span></div>
+        <div class="hb-row" role="listitem" data-tip="SVM|APG: 99.1% ± 1.5" aria-label="SVM, APG: 99.1%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:99.1"></span></span><span class="hb-val">99.1</span></div>
+        <div class="hb-group" aria-hidden="true">SecSVM</div>
+        <div class="hb-row" role="listitem" data-tip="SecSVM|REPLICANT: 98.2% ± 1.0" aria-label="SecSVM, REPLICANT: 98.2%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:98.2"></span></span><span class="hb-val hi">98.2</span></div>
+        <div class="hb-row" role="listitem" data-tip="SecSVM|APG: 98.7% ± 0.9" aria-label="SecSVM, APG: 98.7%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:98.7"></span></span><span class="hb-val">98.7</span></div>
+        <div class="hb-group" aria-hidden="true">Random Forest</div>
+        <div class="hb-row" role="listitem" data-tip="Random Forest|REPLICANT: 93.3% ± 1.7" aria-label="Random Forest, REPLICANT: 93.3%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:93.3"></span></span><span class="hb-val hi">93.3</span></div>
+        <div class="hb-row" role="listitem" data-tip="Random Forest|APG: 65.8% ± 3.2" aria-label="Random Forest, APG: 65.8%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:65.8"></span></span><span class="hb-val">65.8</span></div>
+        <div class="hb-group" aria-hidden="true">DeepDrebin</div>
+        <div class="hb-row" role="listitem" data-tip="DeepDrebin|REPLICANT: 96.5% ± 2.1" aria-label="DeepDrebin, REPLICANT: 96.5%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:96.5"></span></span><span class="hb-val hi">96.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="DeepDrebin|APG: 94.5% ± 2.3" aria-label="DeepDrebin, APG: 94.5%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:94.5"></span></span><span class="hb-val">94.5</span></div>
+        <div class="hb-group" aria-hidden="true">RAMDA</div>
+        <div class="hb-row" role="listitem" data-tip="RAMDA|REPLICANT: 99.9% ± 0.1" aria-label="RAMDA, REPLICANT: 99.9%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:99.9"></span></span><span class="hb-val hi">99.9</span></div>
+        <div class="hb-row" role="listitem" data-tip="RAMDA|APG: 64.5% ± 3.6" aria-label="RAMDA, APG: 64.5%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:64.5"></span></span><span class="hb-val">64.5</span></div>
+        <div class="hb-group" aria-hidden="true">HCC</div>
+        <div class="hb-row" role="listitem" data-tip="HCC|REPLICANT: 98.7% ± 0.9" aria-label="HCC, REPLICANT: 98.7%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:98.7"></span></span><span class="hb-val hi">98.7</span></div>
+        <div class="hb-row" role="listitem" data-tip="HCC|APG: 96.1% ± 2.0" aria-label="HCC, APG: 96.1%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:96.1"></span></span><span class="hb-val">96.1</span></div>
+        <div class="hb-group" aria-hidden="true">DRMD</div>
+        <div class="hb-row" role="listitem" data-tip="DRMD|REPLICANT: 90.2% ± 2.7" aria-label="DRMD, REPLICANT: 90.2%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:90.2"></span></span><span class="hb-val hi">90.2</span></div>
+        <div class="hb-row" role="listitem" data-tip="DRMD|APG: 25.2% ± 2.3" aria-label="DRMD, APG: 25.2%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:25.2"></span></span><span class="hb-val">25.2</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        <span>Matched setting.</span>
+        <details class="chart-table"><summary>Show all attackers as a table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Detector</th><th class="n">REPLICANT</th><th class="n">APG</th><th class="n">ADZ</th><th class="n">EvD</th><th class="n">Rnd</th></tr></thead>
+            <tbody>
+              <tr><td>SVM</td><td class="n">99.1</td><td class="n">99.1</td><td class="n">73.5</td><td class="n">84.0</td><td class="n">74.2</td></tr>
+              <tr><td>SecSVM</td><td class="n">98.2</td><td class="n">98.7</td><td class="n">53.6</td><td class="n">73.5</td><td class="n">54.3</td></tr>
+              <tr><td>Random Forest</td><td class="n">93.3</td><td class="n">65.8</td><td class="n">72.1</td><td class="n">69.9</td><td class="n">70.7</td></tr>
+              <tr><td>DeepDrebin</td><td class="n">96.5</td><td class="n">94.5</td><td class="n">56.0</td><td class="n">69.1</td><td class="n">57.9</td></tr>
+              <tr><td>RAMDA</td><td class="n">99.9</td><td class="n">64.5</td><td class="n">81.3</td><td class="n">72.0</td><td class="n">82.6</td></tr>
+              <tr><td>HCC</td><td class="n">98.7</td><td class="n">96.1</td><td class="n">79.2</td><td class="n">85.2</td><td class="n">81.6</td></tr>
+              <tr><td>DRMD</td><td class="n">90.2</td><td class="n">25.2</td><td class="n">14.5</td><td class="n">34.0</td><td class="n">16.8</td></tr>
+              <tr class="hl"><td>Mean ASR (%)</td><td class="n">96.6</td><td class="n">77.7</td><td class="n">61.5</td><td class="n">69.7</td><td class="n">62.6</td></tr>
+              <tr><td>Avg. queries</td><td class="n">3.6</td><td class="n">6.5</td><td class="n">10.6</td><td class="n">9.9</td><td class="n">10.0</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <h3>All Settings</h3>
+    <div class="prose">
+      <p>In practice, an attacker rarely has a surrogate that matches the target, so we now evaluate REPLICANT across <strong>all 1,764 surrogate/target combinations</strong>, in which the surrogate and target may differ in classifier, feature space, training period, or all axes. REPLICANT achieves the highest evasion rate (78.8% ASR), beating every Android baseline by 13.6–22.2 ASR points. Since the baselines use changes in confidence to steer capability selection, as the surrogate diverges from the target, its confidence degrades as a proxy for the decision boundary of the target. REPLICANT instead learns a policy over the malware used to train the surrogate, thereby capturing the general task of evasion rather than the surrogate confidence topology.</p>
+      <p>Rnd uses the same MDP as REPLICANT, however, it selects when to query and which applicable capability to add at random. Across all settings, Rnd matches the performance of both ADZ and EvD, while approaching the performance of APG at a budget of twenty queries. This demonstrates that: (i) the environment design of REPLICANT provides performance on par with prior attacks under our threat model; (ii) the performance gains over prior attacks are the result of our learned policy; and (iii) it exposes the weakness of relying on surrogate confidence scores for black-box attacks.</p>
+      <p>To isolate the gains of our architecture and reward function, we compare against five alternative RL agent designs adapted to Android by using our environment, threat model, and capability set. We find that in comparison to prior agent designs, REPLICANT improves the mean ASR by 5.6–22.2 points across all 1,764 settings, using 1.1–5.2 less queries on average.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">All 1,764 surrogate/target pairs: attack success by attacker</p>
+        <p class="chart-sub">Mean ASR (%) within 20 queries, ten seeds. Every attacker gets only predicted labels from the target.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>REPLICANT</span><span><i class="sw-n"></i>Baselines and controls</span></div>
+      <div class="hb" role="list" style="--max:100; --label-w:9.5rem">
+        <div class="hb-group" aria-hidden="true">This paper</div>
+        <div class="hb-row" role="listitem" data-tip="REPLICANT|ASR: 78.8% ± 1.2|Avg. queries: 7.4" aria-label="REPLICANT: 78.8%"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:78.8"></span></span><span class="hb-val hi">78.8</span></div>
+        <div class="hb-group" aria-hidden="true">Android attacks</div>
+        <div class="hb-row" role="listitem" data-tip="APG|White-box greedy, run on the surrogate|ASR: 65.2% ± 0.9|Avg. queries: 9.3" aria-label="Android attack APG: 65.2%"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:65.2"></span></span><span class="hb-val">65.2</span></div>
+        <div class="hb-row" role="listitem" data-tip="AdvDroidZero (ADZ)|ASR: 61.5% ± 1.2|Avg. queries: 10.6" aria-label="Android attack AdvDroidZero: 61.5%"><span class="hb-label">AdvDroidZero</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:61.5"></span></span><span class="hb-val">61.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="EvadeDroid (EvD)|ASR: 56.6% ± 0.9|Avg. queries: 11.7" aria-label="Android attack EvadeDroid: 56.6%"><span class="hb-label">EvadeDroid</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:56.6"></span></span><span class="hb-val">56.6</span></div>
+        <div class="hb-group" aria-hidden="true">Control: random policy, same MDP</div>
+        <div class="hb-row" role="listitem" data-tip="Rnd|Random actions in REPLICANT's MDP|ASR: 59.4% ± 1.1|Avg. queries: 10.4" aria-label="Random policy control: 59.4%"><span class="hb-label">Rnd</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:59.4"></span></span><span class="hb-val">59.4</span></div>
+        <div class="hb-group" aria-hidden="true">RL agent designs from Windows PE, adapted</div>
+        <div class="hb-row" role="listitem" data-tip="MEME|Model-based PPO|ASR: 73.2% ± 0.9|Avg. queries: 8.5" aria-label="RL design MEME: 73.2%"><span class="hb-label">MEME</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:73.2"></span></span><span class="hb-val">73.2</span></div>
+        <div class="hb-row" role="listitem" data-tip="MAB-Malware|Thompson-sampling bandit|ASR: 71.2% ± 0.9|Avg. queries: 9.0" aria-label="RL design MAB-Malware: 71.2%"><span class="hb-label">MAB-Malware</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:71.2"></span></span><span class="hb-val">71.2</span></div>
+        <div class="hb-row" role="listitem" data-tip="PSP-Mal|Dueling double DQN|ASR: 59.7% ± 1.2|Avg. queries: 11.0" aria-label="RL design PSP-Mal: 59.7%"><span class="hb-label">PSP-Mal</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:59.7"></span></span><span class="hb-val">59.7</span></div>
+        <div class="hb-row" role="listitem" data-tip="MERLIN|Deep Q-learning|ASR: 59.5% ± 1.4|Avg. queries: 11.3" aria-label="RL design MERLIN: 59.5%"><span class="hb-label">MERLIN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:59.5"></span></span><span class="hb-val">59.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="AIMED-RL|Distributional double DQN|ASR: 56.6% ± 1.5|Avg. queries: 12.6" aria-label="RL design AIMED-RL: 56.6%"><span class="hb-label">AIMED-RL</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:56.6"></span></span><span class="hb-val">56.6</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Attacker</th><th>Type</th><th class="n">ASR (%)</th><th class="n">Avg. queries</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>REPLICANT</td><td>Learned policy</td><td class="n">78.8 ± 1.2</td><td class="n">7.4</td></tr>
+              <tr><td>APG</td><td>Android attack</td><td class="n">65.2 ± 0.9</td><td class="n">9.3</td></tr>
+              <tr><td>AdvDroidZero (ADZ)</td><td>Android attack</td><td class="n">61.5 ± 1.2</td><td class="n">10.6</td></tr>
+              <tr><td>EvadeDroid (EvD)</td><td>Android attack</td><td class="n">56.6 ± 0.9</td><td class="n">11.7</td></tr>
+              <tr><td>Rnd</td><td>Random-policy control</td><td class="n">59.4 ± 1.1</td><td class="n">10.4</td></tr>
+              <tr><td>MEME</td><td>RL design</td><td class="n">73.2 ± 0.9</td><td class="n">8.5</td></tr>
+              <tr><td>MAB-Malware</td><td>RL design</td><td class="n">71.2 ± 0.9</td><td class="n">9.0</td></tr>
+              <tr><td>PSP-Mal</td><td>RL design</td><td class="n">59.7 ± 1.2</td><td class="n">11.0</td></tr>
+              <tr><td>MERLIN</td><td>RL design</td><td class="n">59.5 ± 1.4</td><td class="n">11.3</td></tr>
+              <tr><td>AIMED-RL</td><td>RL design</td><td class="n">56.6 ± 1.5</td><td class="n">12.6</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+      <p class="footnote">The ADZ method does not scale to larger capability sets, therefore, ADZ is the only exception to the shared capability set across attackers. We instead reconstruct a 662-action space from our capability set following the subset of manifest and code perturbations specified in the original work.</p>
+    </figure>
+
+    <h3>Query-Efficiency</h3>
+    <div class="prose">
+      <p>At a query budget of 20, REPLICANT is also the most query-efficient attacker by AvgQ, spending the fewest average queries per sample of any attack: 3.6 in the matched setting and 7.4 across all settings versus the 6.5 and 9.3 of APG, the Android strongest baseline.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Average target queries per malware sample</p>
+        <p class="chart-sub">AvgQ under a 20-query budget, ten seeds. Lower is better for the attacker.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>REPLICANT</span><span><i class="sw-n"></i>Baselines and controls</span></div>
+      <div class="hb" role="list" style="--max:20; --label-w:7.5rem">
+        <div class="hb-group" aria-hidden="true">Matched setting (42 pairs)</div>
+        <div class="hb-row" role="listitem" data-tip="REPLICANT, matched|Avg. queries: 3.6 ± 0.3" aria-label="Matched, REPLICANT: 3.6 queries"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:3.6"></span></span><span class="hb-val hi">3.6</span></div>
+        <div class="hb-row" role="listitem" data-tip="APG, matched|Avg. queries: 6.5 ± 0.2" aria-label="Matched, APG: 6.5 queries"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:6.5"></span></span><span class="hb-val">6.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="EvadeDroid, matched|Avg. queries: 9.9 ± 0.2" aria-label="Matched, EvadeDroid: 9.9 queries"><span class="hb-label">EvadeDroid</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:9.9"></span></span><span class="hb-val">9.9</span></div>
+        <div class="hb-row" role="listitem" data-tip="Rnd, matched|Avg. queries: 10.0 ± 0.2" aria-label="Matched, Rnd: 10.0 queries"><span class="hb-label">Rnd</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:10.0"></span></span><span class="hb-val">10.0</span></div>
+        <div class="hb-row" role="listitem" data-tip="AdvDroidZero, matched|Avg. queries: 10.6 ± 0.2" aria-label="Matched, AdvDroidZero: 10.6 queries"><span class="hb-label">AdvDroidZero</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:10.6"></span></span><span class="hb-val">10.6</span></div>
+        <div class="hb-group" aria-hidden="true">All settings (1,764 pairs)</div>
+        <div class="hb-row" role="listitem" data-tip="REPLICANT, all settings|Avg. queries: 7.4 ± 0.2" aria-label="All settings, REPLICANT: 7.4 queries"><span class="hb-label">REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:7.4"></span></span><span class="hb-val hi">7.4</span></div>
+        <div class="hb-row" role="listitem" data-tip="APG, all settings|Avg. queries: 9.3 ± 0.2" aria-label="All settings, APG: 9.3 queries"><span class="hb-label">APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:9.3"></span></span><span class="hb-val">9.3</span></div>
+        <div class="hb-row" role="listitem" data-tip="Rnd, all settings|Avg. queries: 10.4 ± 0.2" aria-label="All settings, Rnd: 10.4 queries"><span class="hb-label">Rnd</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:10.4"></span></span><span class="hb-val">10.4</span></div>
+        <div class="hb-row" role="listitem" data-tip="AdvDroidZero, all settings|Avg. queries: 10.6 ± 0.2" aria-label="All settings, AdvDroidZero: 10.6 queries"><span class="hb-label">AdvDroidZero</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:10.6"></span></span><span class="hb-val">10.6</span></div>
+        <div class="hb-row" role="listitem" data-tip="EvadeDroid, all settings|Avg. queries: 11.7 ± 0.2" aria-label="All settings, EvadeDroid: 11.7 queries"><span class="hb-label">EvadeDroid</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:11.7"></span></span><span class="hb-val">11.7</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">5</span><span style="left:50%">10</span><span style="left:75%">15</span><span style="left:100%">20</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Attacker</th><th class="n">Matched AvgQ</th><th class="n">All settings AvgQ</th></tr></thead>
+            <tbody>
+              <tr class="hl"><td>REPLICANT</td><td class="n">3.6</td><td class="n">7.4</td></tr>
+              <tr><td>APG</td><td class="n">6.5</td><td class="n">9.3</td></tr>
+              <tr><td>AdvDroidZero</td><td class="n">10.6</td><td class="n">10.6</td></tr>
+              <tr><td>EvadeDroid</td><td class="n">9.9</td><td class="n">11.7</td></tr>
+              <tr><td>Rnd</td><td class="n">10.0</td><td class="n">10.4</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <h3>Datasets &amp; VTT</h3>
+    <div class="prose">
+      <p>Our main results use the canonical Hypercube dataset, which samples the distribution and labels applications using VirusTotal threshold of 2 (VTT2). To confirm our results are not an artifact of this threshold, we re-run the black-box experiments on a variant of Hypercube created for VTT4. Since VTT4 creates a higher standard for samples to be labeled as malware, it simplifies the detection task, dropping misclassification rates for 2022 malware from 63.8% to 46.9%. Thus VTT4 has a two-fold effect on our evaluation that makes it more favorable for the attacker: (i) it provides a larger test set as more malware are detected by all targets for a given seed and (ii) it produces more capable surrogates that provide a better proxy for the targets. These two factors result in a higher mean ASR across all attacks; REPLICANT rises from 78.8% (VTT2) to 94.1% (VTT4), remaining the dominant attacker (12.6% better than the best baseline). Therefore, since using VTT2 follows current best practice and it is the more conservative setting for attack performance, our main results give a realistic measure of attack efficacy that is not inflated by higher labeling thresholds.</p>
+    </div>
+
+    <h3>Evaluation Periods</h3>
+    <div class="prose">
+      <p>To confirm the attacks are also effective in-distribution, we additionally test on the malware from the surrogate split of each target’s training year (e.g., 2021a malware for a 2021b target, and 2022a for a 2022b target). The attack remains effective, with only a minor decline in performance; the mean ASR of REPLICANT on in-distribution malware is 70.0% compared to the 78.7% of the main temporally withheld results. Furthermore, when testing on malware from two and three years after the training periods, the mean ASR rises to 89.4% and 95.4%, respectively.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="transfer">
+    <h2>Transferring Policies</h2>
+    <div class="prose">
+      <p>We analyze both <strong>Policy Transfer Evasion (PTE)</strong>, where the policy learned by REPLICANT is deployed against the target; and <strong>Sample Transfer Evasion (STE)</strong>, where REPLICANT evades the surrogate, and those adversarial samples are applied directly to the target. Therefore, both attacks use identical policies, capabilities, and surrogates; they only differ in whether the learned policy is employed as an active attacker or used to pre-compute adversarial samples, as done in classical transfer attacks.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 640 410" role="img" aria-label="Policy transfer versus sample transfer. A policy is trained on the attacker's surrogate. In policy transfer it repeatedly sends modified apps to the target and reads back labels until evasion, evading 78.8 percent of malware. In sample transfer it evades the surrogate and the fixed adversarial samples are sent to the target once, evading 43.3 percent. Seven detectors, three feature spaces and two training periods give 42 models; any surrogate paired with any target gives 1,764 pairs.">
+        <defs>
+          <marker id="ah-xfer" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-xfer-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+
+        <text class="t-mono t-red" x="16" y="30">POLICY TRANSFER (PTE)</text>
+        <text class="t-mono t-muted" x="16" y="262">SAMPLE TRANSFER (STE)</text>
+
+        <path class="box" d="M28 110H146V168L134 180H16V122Z"/>
+        <text class="t-mono t-muted mid" x="81" y="138">SURROGATE</text>
+        <text class="t-sm mid" x="81" y="160">attacker's model</text>
+        <path class="ln" d="M146 145 H196" marker-end="url(#ah-xfer)"/>
+        <text class="t-sm t-muted mid" x="171" y="137">train</text>
+        <path class="box-solid" d="M212 110H320V168L308 180H200V122Z"/>
+        <text class="t-mono t-on-red mid" x="260" y="138">POLICY</text>
+        <text class="t-b t-on-red mid" x="260" y="160">REPLICANT</text>
+
+        <path class="ln-red" d="M250 110 V45 H472" marker-end="url(#ah-xfer-red)"/>
+        <text class="t-sm t-red mid" x="370" y="37">modified app</text>
+        <path class="ln" d="M476 70 H270 V106" marker-end="url(#ah-xfer)"/>
+        <text class="t-sm t-muted mid" x="380" y="86">label 0 / 1</text>
+        <text class="t-sm t-muted mid" x="390" y="104">repeat until evaded</text>
+        <path class="box" d="M488 20H616V78L604 90H476V32Z"/>
+        <text class="t-mono t-muted mid" x="546" y="46">TARGET</text>
+        <text class="t-b t-red mid" x="546" y="70">78.8% evaded</text>
+
+        <path class="ln-red" d="M260 180 V245 H306" marker-end="url(#ah-xfer-red)"/>
+        <text class="t-sm t-red end" x="252" y="216">evade surrogate</text>
+        <path class="box" d="M322 210H420V268L408 280H310V222Z"/>
+        <text class="t-mono t-muted mid" x="365" y="238">SAMPLES</text>
+        <text class="t-sm mid" x="365" y="258">pre-computed</text>
+        <path class="ln" d="M420 245 H472" marker-end="url(#ah-xfer)"/>
+        <text class="t-sm t-muted mid" x="446" y="237">send</text>
+        <text class="t-sm t-muted mid" x="446" y="261">once</text>
+        <path class="box" d="M488 210H616V268L604 280H476V222Z"/>
+        <text class="t-mono t-muted mid" x="546" y="236">TARGET</text>
+        <text class="t-b mid" x="546" y="260">43.3% evaded</text>
+
+        <path class="ln ln-dash" d="M16 298 H624"/>
+        <text class="t-mono t-muted" x="16" y="322">WHERE THE 1,764 PAIRS COME FROM</text>
+        <path class="box" d="M26 334H140V364L130 374H16V344Z"/>
+        <text class="mid" x="78" y="359">7 detectors</text>
+        <text class="t-lg t-muted mid" x="153" y="360">×</text>
+        <path class="box" d="M176 334H290V364L280 374H166V344Z"/>
+        <text class="mid" x="228" y="359">3 feature spaces</text>
+        <text class="t-lg t-muted mid" x="303" y="360">×</text>
+        <path class="box" d="M326 334H440V364L430 374H316V344Z"/>
+        <text class="mid" x="378" y="359">2 train periods</text>
+        <text class="t-lg t-muted mid" x="453" y="360">=</text>
+        <path class="box-red" d="M476 334H616V364L606 374H466V344Z"/>
+        <text class="t-b mid" x="541" y="359">42 models</text>
+        <text class="t-sm t-ink2 mid" x="320" y="398">any of the 42 as surrogate × any of the 42 as target = 1,764 pairs</text>
+      </svg>
+      </div>
+      <figcaption>The ten attacks are evaluated across 1,764 surrogate/target combinations (7×7 classifiers, 3×3 feature spaces, and 2×2 training periods).</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>Specifically, we consider four transferability axes: the <strong>temporal gap</strong> (when training periods differ), the <strong>architecture gap</strong> (when classifiers differ), the <strong>representation gap</strong> (when feature spaces differ), and the <strong>combined gap</strong> (when all differ).</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Policy transfer against sample transfer, by surrogate/target gap</p>
+        <p class="chart-sub">Mean ASR (%) of REPLICANT within 20 queries (PTE) and of its pre-computed samples (STE), ten seeds.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Policy transfer (PTE)</span><span><i class="sw-n"></i>Sample transfer (STE)</span></div>
+      <div class="hb" role="list" style="--max:100; --label-w:7rem">
+        <div class="hb-group" aria-hidden="true">Matched</div>
+        <div class="hb-row" role="listitem" data-tip="Matched|PTE: 96.6% ± 0.7, 3.6 queries" aria-label="Matched, policy transfer: 96.6%"><span class="hb-label">PTE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:96.6"></span></span><span class="hb-val hi">96.6</span></div>
+        <div class="hb-row" role="listitem" data-tip="Matched|STE: 59.4% ± 4.3" aria-label="Matched, sample transfer: 59.4%"><span class="hb-label">STE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:59.4"></span></span><span class="hb-val">59.4</span></div>
+        <div class="hb-group" aria-hidden="true">Temporal gap</div>
+        <div class="hb-row" role="listitem" data-tip="Temporal gap|PTE: 96.6% ± 0.6, 3.6 queries" aria-label="Temporal gap, policy transfer: 96.6%"><span class="hb-label">PTE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:96.6"></span></span><span class="hb-val hi">96.6</span></div>
+        <div class="hb-row" role="listitem" data-tip="Temporal gap|STE: 59.4% ± 4.4" aria-label="Temporal gap, sample transfer: 59.4%"><span class="hb-label">STE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:59.4"></span></span><span class="hb-val">59.4</span></div>
+        <div class="hb-group" aria-hidden="true">Architecture gap</div>
+        <div class="hb-row" role="listitem" data-tip="Architecture gap|PTE: 87.4% ± 1.1, 5.8 queries" aria-label="Architecture gap, policy transfer: 87.4%"><span class="hb-label">PTE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:87.4"></span></span><span class="hb-val hi">87.4</span></div>
+        <div class="hb-row" role="listitem" data-tip="Architecture gap|STE: 44.7% ± 1.8" aria-label="Architecture gap, sample transfer: 44.7%"><span class="hb-label">STE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:44.7"></span></span><span class="hb-val">44.7</span></div>
+        <div class="hb-group" aria-hidden="true">Representation gap</div>
+        <div class="hb-row" role="listitem" data-tip="Representation gap|PTE: 78.8% ± 1.3, 7.6 queries" aria-label="Representation gap, policy transfer: 78.8%"><span class="hb-label">PTE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:78.8"></span></span><span class="hb-val hi">78.8</span></div>
+        <div class="hb-row" role="listitem" data-tip="Representation gap|STE: 42.5% ± 2.8" aria-label="Representation gap, sample transfer: 42.5%"><span class="hb-label">STE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:42.5"></span></span><span class="hb-val">42.5</span></div>
+        <div class="hb-group" aria-hidden="true">Combined gap</div>
+        <div class="hb-row" role="listitem" data-tip="Combined gap|PTE: 73.0% ± 1.5, 8.5 queries" aria-label="Combined gap, policy transfer: 73.0%"><span class="hb-label">PTE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:73.0"></span></span><span class="hb-val hi">73.0</span></div>
+        <div class="hb-row" role="listitem" data-tip="Combined gap|STE: 41.3% ± 1.9" aria-label="Combined gap, sample transfer: 41.3%"><span class="hb-label">STE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:41.3"></span></span><span class="hb-val">41.3</span></div>
+        <div class="hb-group" aria-hidden="true">All settings</div>
+        <div class="hb-row" role="listitem" data-tip="All settings|PTE: 78.8% ± 1.2, 7.4 queries" aria-label="All settings, policy transfer: 78.8%"><span class="hb-label">PTE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:78.8"></span></span><span class="hb-val hi">78.8</span></div>
+        <div class="hb-row" role="listitem" data-tip="All settings|STE: 43.3% ± 1.8" aria-label="All settings, sample transfer: 43.3%"><span class="hb-label">STE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:43.3"></span></span><span class="hb-val">43.3</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Gap</th><th class="n">PTE ASR (%)</th><th class="n">PTE AvgQ</th><th class="n">STE ASR (%)</th></tr></thead>
+            <tbody>
+              <tr><td>Matched</td><td class="n">96.6 ± 0.7</td><td class="n">3.6</td><td class="n">59.4 ± 4.3</td></tr>
+              <tr><td>Temporal</td><td class="n">96.6 ± 0.6</td><td class="n">3.6</td><td class="n">59.4 ± 4.4</td></tr>
+              <tr><td>Architecture</td><td class="n">87.4 ± 1.1</td><td class="n">5.8</td><td class="n">44.7 ± 1.8</td></tr>
+              <tr><td>Representation</td><td class="n">78.8 ± 1.3</td><td class="n">7.6</td><td class="n">42.5 ± 2.8</td></tr>
+              <tr><td>Combined</td><td class="n">73.0 ± 1.5</td><td class="n">8.5</td><td class="n">41.3 ± 1.9</td></tr>
+              <tr class="hl"><td>All settings</td><td class="n">78.8 ± 1.2</td><td class="n">7.4</td><td class="n">43.3 ± 1.8</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <ul>
+        <li><strong>Temporal Gap.</strong> Matching the classifier and feature space but training the surrogate and target in different periods, PTE retains a mean ASR of 96.6%, statistically indistinguishable from the matched setting. Therefore, the learned policy is effectively invariant to the temporal gap; the only appreciable difference is between 2021b and 2022b targets, which is a result of temporal luck rather than the surrogate-target gap.</li>
+        <li><strong>Architecture Gap.</strong> When the surrogate and target share the same feature space but differ in architecture, transfer remains strong: PTE evades 87.4% of malware within twenty queries against 44.7% for STE, and overtakes STE within roughly two queries. Given a shared representation, the learned effect that each modify action has on the feature space still holds for the target; the agent, therefore, retains an accurate model of how its capabilities change a sample. The architecture gap is thus paid foremost in queries: ASR rises slowly against the targets whose boundaries differ most from the surrogate, most notably DRMD, the only RL-trained detector, whose categorically different training regime makes its boundary the least similar to the others.</li>
+        <li><strong>Representation Gap.</strong> Keeping the architecture fixed while moving the surrogate and target into different feature spaces lowers ASR to 78.8%, still far above the 42.5% of sample transfer. The performance decay concentrates on pairs involving RAMDA especially when it is used as the surrogate. A policy trained on RAMDA, the smallest feature space, and deployed against a richer target space has only learned capabilities that affect a small fraction of the target representation and must therefore rely either on that sub-region to influence the decision of the target or on incidental side-effects its capabilities produce elsewhere in the larger representation. Conversely, transferring an attack into a smaller representation, such as RAMDA, can render many of its modifications invisible to the target, as they are not captured by the representation of the target. Therefore, this reduction in ASR reflects an underlying property of the representation gap rather than any intrinsic robustness of RAMDA.</li>
+        <li><strong>Combined Gap.</strong> This is the hardest regime, where the surrogate differs from the target in architecture, feature space, and training period. The costs of each transferability gap now compound: the policy pays in queries to push towards the shifted boundary and in expressiveness to compose capabilities in a representation it was not trained on, lowering the ASR of PTE to 73.0%, still far above the 41.4% of STE. DRMD is the hardest target to evade, which is further compounded by the representation gap to produce the slowest per-query ASR rise. Even so, PTE reaches an ASR of 41.1% against it, whereas STE reaches only 4.2%.</li>
+      </ul>
+    </div>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Policy over Sample Transfer</span><p>A transferred sample is optimized to pass the decision boundary of the surrogate and relies on the alignment of decision boundaries. A transferred policy instead encodes a distribution over actions conditioned on the current representation of the sample. This provides PTE with a distinct advantage that is exactly where STE fails: as surrogate and target diverge, misaligned boundaries cause sample transfer to decay, while an adaptive policy re-queries until the decision boundary is crossed. Averaged over all settings, PTE reaches 78.8% ASR against 43.3% for STE, and overtakes the ASR of STE within three queries on average.</p></div>
+
+    <blockquote class="excerpt"><p>When the surrogate and target agree on nothing but the distribution from which their training data was drawn, what transfers best is the learning of how to evade, not specific evasive samples.</p></blockquote>
+  </section>
+
+  <section class="psec" id="hardening">
+    <h2>Adversarial Training</h2>
+    <div class="prose">
+      <p>Despite a long history of proposed defenses against evasion attacks, adversarial training remains one of the few defenses that has consistently demonstrated empirical robustness. Evasion attacks highlight the weakness in a models decision-making; by retraining against these adversarial samples the model can become hardened or more robust against such attacks.</p>
+      <p>The robustness gained from adversarial training depends on the quality of the attacker, so we harden with the strongest attacker from each attack type (i.e., policy-based and per-sample optimization). Therefore, we use REPLICANT for learned policies and APG for per-sample optimization to provide the most informative comparison. As we are not considering transferability, and evasion rates are similar between the feature spaces in the matched setting, we focus this analysis on the Drebin feature space because it is the most widely used representation.</p>
+      <p>We also produce a white-box variant of REPLICANT (<strong>REPLICANT<sub>WB</sub></strong>) for use in AT and the robustness evaluations of the hardened targets. Architecturally, REPLICANT<sub>WB</sub> drops the query head and submits after every modification, since query efficiency is not required in the white-box setting; it also uses the confidence score of the target, clf<sub>score</sub>, for rewards. Since confidence deltas can be small, we scale them by λ<sub>WB</sub> = 5 for all targets. Beyond architecture and reward, the rest of the REPLICANT formulation remains unchanged.</p>
+    </div>
+
+    <h3>AT-REPLICANT</h3>
+    <ol class="steps">
+      <li><div><h4>Train a fresh policy</h4><p>Each round of AT-REPLICANT trains a fresh REPLICANT<sub>WB</sub> policy against the classifier being hardened.</p></div></li>
+      <li><div><h4>Collect every adversarial sample</h4><p>Simultaneously collecting adversarial samples throughout training exposes the classifier to many distinct variants of every malware sample, unlike collection from an already-converged policy or via greedy composition.</p></div></li>
+      <li><div><h4>Retrain the classifier</h4><p>The unique adversarial samples collected are added to the training set of the classifier for retraining before the next round.</p></div></li>
+      <li><div><h4>Repeat for 15 rounds</h4><p>As the classifier becomes harder to evade with each round, a fixed training budget yields progressively fewer adversarial samples, so we increase the number of policy updates as AT progresses. Empirically the number of new adversarial samples collapses after five rounds under a fixed budget, whereas doubling the policy updates of REPLICANT<sub>WB</sub> every five rounds maintains adversarial sample production across all 15 rounds.</p></div></li>
+    </ol>
+    <div class="prose">
+      <p>AT-REPLICANT and AT-APG follow the pipeline, however, AT-APG collects adversarial samples during its per-sample rollouts as it does not have a training phase.</p>
+    </div>
+
+    <h3>Robustness Evaluation</h3>
+    <div class="prose">
+      <p>We evaluate each classifier trained by both AT pipelines against both REPLICANT<sub>WB</sub> and APG<sub>WB</sub> attacks.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b class="red">9.9%</b><span>mean ASR of REPLICANT<sub>WB</sub> against AT-REPLICANT after 15 rounds</span></div>
+      <div class="stat"><b>16.3%</b><span>mean ASR of APG<sub>WB</sub>, an unseen attacker, against AT-REPLICANT</span></div>
+      <div class="stat"><b>62.4%</b><span>mean ASR of REPLICANT<sub>WB</sub> against AT-APG, which remains vulnerable</span></div>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Attack success against hardened detectors after 15 rounds</p>
+        <p class="chart-sub">Mean ASR (%) over seven detectors, Drebin features. Lower is better for the defender.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Hardened with AT-REPLICANT</span><span><i class="sw-n"></i>Hardened with AT-APG</span></div>
+      <div class="hb" role="list" style="--max:100; --label-w:8rem">
+        <div class="hb-group" aria-hidden="true">Attacked by REPLICANT-WB</div>
+        <div class="hb-row" role="listitem" data-tip="REPLICANT-WB attack|vs AT-REPLICANT: 9.9% ± 1.3" aria-label="REPLICANT-WB attack against AT-REPLICANT: 9.9%"><span class="hb-label">AT-REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:9.9"></span></span><span class="hb-val hi">9.9</span></div>
+        <div class="hb-row" role="listitem" data-tip="REPLICANT-WB attack|vs AT-APG: 62.4% ± 1.8" aria-label="REPLICANT-WB attack against AT-APG: 62.4%"><span class="hb-label">AT-APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:62.4"></span></span><span class="hb-val">62.4</span></div>
+        <div class="hb-group" aria-hidden="true">Attacked by APG-WB</div>
+        <div class="hb-row" role="listitem" data-tip="APG-WB attack|vs AT-REPLICANT: 16.3% ± 1.2" aria-label="APG-WB attack against AT-REPLICANT: 16.3%"><span class="hb-label">AT-REPLICANT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:16.3"></span></span><span class="hb-val hi">16.3</span></div>
+        <div class="hb-row" role="listitem" data-tip="APG-WB attack|vs AT-APG: 35.6% ± 1.1" aria-label="APG-WB attack against AT-APG: 35.6%"><span class="hb-label">AT-APG</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:35.6"></span></span><span class="hb-val">35.6</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show per detector</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Detector</th><th class="n">REPLICANT<sub>WB</sub> vs AT-REPLICANT</th><th class="n">REPLICANT<sub>WB</sub> vs AT-APG</th><th class="n">APG<sub>WB</sub> vs AT-REPLICANT</th><th class="n">APG<sub>WB</sub> vs AT-APG</th></tr></thead>
+            <tbody>
+              <tr><td>SVM</td><td class="n">9.8</td><td class="n">99.9</td><td class="n">10.1</td><td class="n">100.0</td></tr>
+              <tr><td>SecSVM</td><td class="n">8.9</td><td class="n">48.4</td><td class="n">9.3</td><td class="n">49.3</td></tr>
+              <tr><td>Random Forest</td><td class="n">1.9</td><td class="n">77.4</td><td class="n">3.7</td><td class="n">7.8</td></tr>
+              <tr><td>DeepDrebin</td><td class="n">7.2</td><td class="n">12.1</td><td class="n">17.2</td><td class="n">13.6</td></tr>
+              <tr><td>RAMDA</td><td class="n">16.0</td><td class="n">86.9</td><td class="n">14.0</td><td class="n">19.6</td></tr>
+              <tr><td>HCC</td><td class="n">18.2</td><td class="n">25.7</td><td class="n">51.2</td><td class="n">46.6</td></tr>
+              <tr><td>DRMD</td><td class="n">7.6</td><td class="n">86.4</td><td class="n">8.8</td><td class="n">12.2</td></tr>
+              <tr class="hl"><td>Mean</td><td class="n">9.9</td><td class="n">62.4</td><td class="n">16.3</td><td class="n">35.6</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <p>After 15 rounds, AT-REPLICANT reduces the mean ASR to 9.9% and 16.3% for REPLICANT<sub>WB</sub> and APG<sub>WB</sub>, respectively. Therefore, AT-REPLICANT produces classifiers that are robust against both the attack it was trained on and an unseen attacker. Conversely, AT-APG primarily reduces the mean ASR of APG<sub>WB</sub> (35.6%) while remaining vulnerable to REPLICANT<sub>WB</sub> (62.4%).</p>
+      <p>APG is greedy and deterministic, thus each round naturally focuses on a small sub-set of capabilities and limits the diversity of adversarial samples produced. As a result, REPLICANT<sub>WB</sub> learns capability sequences outside from the targeted paths AT-APG trained on, and achieves a mean ASR of 62.4%. Conversely, the robustness learned by AT-REPLICANT generalizes better as it collects diverse adversarial samples during stochastic policy training, providing significantly more coverage of attack paths. Therefore, the coverage of possible paths modulates how broadly the robustness gained by AT can generalize.</p>
+    </div>
+
+    <h3>Clean Performance</h3>
+    <div class="prose">
+      <p>AT-REPLICANT has a more adverse effect than AT-APG to the initial F<sub>1</sub> performance in the first test month (mean F<sub>1</sub> drop across classifiers of −5.6 versus −3.1). However, when considering performance-over-time, both AT pipelines increase mean A-AUT(F<sub>1</sub>) in four of the seven total classifiers, with AT-REPLICANT hardened classifiers improving mean A-AUT(F<sub>1</sub>) by 2.8 compared to the 1.1 gain of AT-APG. Therefore, although AT reduces initial performance, the new malware variants for training created by AT-REPLICANT mildly improve the generalization of most classifiers as samples start to drift over time.</p>
+    </div>
+
+    <h3>Capability Drift</h3>
+    <div class="prose">
+      <p>In this section we test whether the robustness learned by the AT pipelines generalizes to unseen problem-space capabilities, which we refer to as <span class="term">capability drift</span>. Therefore, we split the capability set in two: (i) the capability set used by both the AT and the initial attacker; and, (ii) the held-out attacker capabilities used to measure generalization to capability drift. Attackers are evaluated six separate times, starting with the initial capability set, and then progressively adding 10% of the total capabilities back in each subsequent evaluation.</p>
+      <p>AT-REPLICANT shows robustness against both REPLICANT<sub>WB</sub> (8.7%) and APG<sub>WB</sub> (14.6%), whereas AT-APG primarily against APG<sub>WB</sub> (26.6% versus the 49.5% of REPLICANT<sub>WB</sub>). However, as capability drift increases so does the mean ASR of REPLICANT<sub>WB</sub>, with the full capability set reaching 91.3% (AT-REPLICANT) and 96.1% (AT-APG).</p>
+    </div>
+    <div class="table-wrap"><table class="data-table wrap-head">
+      <thead><tr><th>Hardened with</th><th class="n">REPLICANT<sub>WB</sub> ASR, reduced set (50%)</th><th class="n">REPLICANT<sub>WB</sub> ASR, full set (100%)</th></tr></thead>
+      <tbody>
+        <tr class="hl"><td>AT-REPLICANT</td><td class="n">8.7%</td><td class="n">91.3%</td></tr>
+        <tr><td>AT-APG</td><td class="n">49.5%</td><td class="n">96.1%</td></tr>
+      </tbody>
+    </table></div>
+    <div class="prose">
+      <p style="margin-top:16px">Therefore, as the attacker set changes, the two AT pipelines demonstrate similar robustness to APG<sub>WB</sub>; however, AT-REPLICANT remains consistently more robust than AT-APG to the REPLICANT<sub>WB</sub> attacker at every stage of capability drift (mean ASR reduction of −40.8 to −4.9 percentage points). This demonstrates that although AT-REPLICANT generalizes better to capability drift than AT-APG, AT has natural limitations with respect to the capability set it was trained against. Therefore, in practical deployments just as classifiers need active learning to adapt to temporal drift, AT must also adapt to capability drift.</p>
+    </div>
+
+    <h3>Temporal Drift</h3>
+    <div class="prose">
+      <p>Over time both goodware and malware evolve, without adaptation, the performance of a trained detector decays as new samples drift further from the training distribution. We compare five different pipelines for the classifiers against fixed REPLICANT attackers (under both the white-box and black-box settings): (i) Base, the static classifier from its respective training period; (ii) AL, which performs monthly AL updates with 400 samples selected from that period using uncertainty-based selection; (iii) AT, the AT-REPLICANT pipeline; (iv) AT&amp;AL, the AT-REPLICANT hardened classifiers with AL across the test periods; and, (v) Robust AL (RAL). We propose RAL, which extends AL by running one AT-REPLICANT round on the malware collected each AL period and adds the resulting adversarial samples to the AL update set.</p>
+    </div>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Pipeline</th><th class="n">A-AUT(F<sub>1</sub>) ↑</th><th class="n">A-AUT(ASR), WB ↓</th><th class="n">A-AUT(ASR), BB ↓</th></tr></thead>
+      <tbody>
+        <tr><td>Base (no updates)</td><td class="n">26.7</td><td class="n">99.9</td><td class="n">93.9</td></tr>
+        <tr><td>AL</td><td class="n">49.8</td><td class="n">98.2</td><td class="n">88.5</td></tr>
+        <tr><td>AT (AT-REPLICANT)</td><td class="n">29.5</td><td class="n">0.1</td><td class="n">0.4</td></tr>
+        <tr><td>AT&amp;AL</td><td class="n">47.9</td><td class="n">19.4</td><td class="n">20.6</td></tr>
+        <tr class="hl"><td>RAL (ours)</td><td class="n">49.0</td><td class="n">0.6</td><td class="n">0.8</td></tr>
+      </tbody>
+    </table></div>
+    <div class="prose">
+      <p style="margin-top:16px">Drift adaptation (↑A-AUT(F<sub>1</sub>)) and adversarial robustness (↓A-AUT(ASR) WB &amp; BB) are largely orthogonal, with no prior strategy improving both metrics over the three-year evaluation. AL recovers the most clean performance of any configuration (49.8) but, as it never exposes the classifiers to adversarial samples in training, the adaptation only has a minor reduction on attack performance (98.2% WB, 88.5% BB); AT conversely suppresses the attackers to near-zero ASR, however, provides only minor robustness to temporal drift (29.5). Combining AT&amp;AL improves performance with regards to temporal drift at the cost of adversarial robustness (19.4% WB, 20.6% BB). Finally, only our RAL, with its combination of clean and adversarial samples for retraining, improves on both axes, matching the clean performance of AL (49.0 versus 49.8) while preserving the adversarial robustness from AT (0.6% WB versus 0.1% WB).</p>
+      <p>Therefore, just as AL is needed to adapt to temporal drift, AT must continually adapt alongside it, as neither AL nor AT alone is sufficient.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="takeaways">
+    <h2>Contributions</h2>
+    <ul class="takeaways">
+      <li><span><strong>REPLICANT Framework.</strong> We propose REPLICANT, a general DRL-based framework that learns problem-space evasion over a capability set as a hierarchical policy, improving Attack Success Rate (ASR) by 20.9%–39.2% compared to state-of-the-art Android attacks.</span></li>
+      <li><span><strong>Policy Transfer.</strong> We demonstrate that a policy trained against a surrogate transfers more effectively than the samples that evade the same surrogate, yielding an 82.0% relative increase in ASR.</span></li>
+      <li><span><strong>AT &amp; Capability Drift.</strong> We show that AT-REPLICANT reduces attacker success below 17% for both REPLICANT<sub>WB</sub> and a APG<sub>WB</sub>, whereas AT-APG leaves the model over five times more vulnerable to REPLICANT<sub>WB</sub>. We also show that the robustness gained from AT diminishes as the attacker capabilities expand from the capability set used by the defender.</span></li>
+      <li><span><strong>Robustness under Drift.</strong> We establish that applying AL directly to AT hardened classifiers recovers drift-induced performance but degrades robustness, whereas our Robust AL (RAL) retains the performance-over-time of AL and the robustness of AT.</span></li>
+      <li><span><strong>Comprehensive Study.</strong> We conduct the largest evaluation of problem-space Android malware evasion to date, comprising 379,680 attack evaluations, isolating the gains of evasion strategies on attacker success.</span></li>
+    </ul>
+    <blockquote class="excerpt"><p>Together, these results establish learned policies as a state-of-the-art foundation for both attacking and adversarially training malware detectors.</p></blockquote>
+  </section>
+</Paper>
+
+<style is:global>
+  .paper-body sub { font-size: .72em; line-height: 0; }
+  .paper-body .figure.chart { margin: 32px 0; }
+  .paper-body .data-table.wrap-head th.n { white-space: normal; }
+  @media (min-width: 641px) { .paper-body .cards.two { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 561px) {
+    .paper-body .stats.quad { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .paper-body .stats.quad > .stat:nth-child(2n) { border-right: 0; padding-left: 20px; }
+    .paper-body .stats.quad > .stat:nth-child(2n+1) { padding-left: 0; }
+    .paper-body .stats.quad > .stat:nth-child(-n+2) { border-bottom: 1px solid var(--smoke); }
+  }
+</style>

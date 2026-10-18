@@ -1,0 +1,37 @@
+{
+  "s2labres/DRMD": {
+    "language": "Python",
+    "stars": 11,
+    "forks": 0
+  },
+  "alan-turing-institute/DRL4Sec-Pitfalls": {
+    "language": "Python",
+    "stars": 1,
+    "forks": 0
+  },
+  "alan-turing-institute/mumoRAG-attacks": {
+    "language": "Jupyter Notebook",
+    "stars": 12,
+    "forks": 0
+  },
+  "isneslab/Wendigo": {
+    "language": "Python",
+    "stars": 6,
+    "forks": 0
+  },
+  "s2labres/RPAL": {
+    "language": "Python",
+    "stars": 3,
+    "forks": 0
+  },
+  "s2labres/tesseract-ml-release": {
+    "language": "Python",
+    "stars": 21,
+    "forks": 7
+  },
+  "McFadden-S/MARSim": {
+    "language": "Python",
+    "stars": 3,
+    "forks": 0
+  }
+}

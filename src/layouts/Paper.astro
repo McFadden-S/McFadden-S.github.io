@@ -1,0 +1,96 @@
+---
+import Base from './Base.astro';
+import { byId, neighbours, ME } from '../data/papers';
+import { DESCRIPTIONS } from '../scripts/anim/scenes.js';
+
+interface Props {
+  id: string;
+  affils?: string[];
+  sections: { id: string; label: string }[];
+}
+const { id, affils, sections } = Astro.props;
+const p = byId[id];
+if (!p) throw new Error(`Unknown paper id: ${id}`);
+const { prev, next } = neighbours(id);
+const animation = (DESCRIPTIONS as Record<string, string>)[id];
+const longest = Math.max(...p.short.split(/\s+/).map((w) => w.length));
+---
+<Base title={p.short} description={p.title}>
+  <section class="paper-hero">
+    <div class="wrap">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <a href="/publications/">Publications</a><span aria-hidden="true">/</span><span>{p.year}</span>
+      </nav>
+      <p class="paper-short wide" style={`--len:${longest + 1}`} data-decode="700" aria-hidden="true">{p.short}</p>
+      <div class="paper-hero__grid">
+        <h1 class="paper-title">{p.title}</h1>
+        <div class="paper-meta">
+          <p class="paper-venue">
+            <span class="livery" data-type={p.type}>{p.abbr}</span>
+            <span>{p.venue}, {p.year}</span>
+          </p>
+          <ul class="paper-authors" aria-label="Authors">
+            {p.authors.map((a) => <li>{a === ME ? <span class="me">{a}</span> : a}</li>)}
+          </ul>
+          {affils && <ul class="paper-affils" aria-label="Affiliations">{affils.map((a) => <li>{a}</li>)}</ul>}
+        </div>
+        <div class="btn-row paper-links">
+          {p.links.map((l, i) => (
+            <a class={`btn${i === 0 ? ' primary' : ''}`} data-augmented-ui="tl-clip br-clip border" href={l.href}>{l.label}</a>
+          ))}
+          <a class="btn" data-augmented-ui="tl-clip br-clip border" href="#cite">Cite</a>
+        </div>
+        {animation && (
+          <figure class="paper-anim" data-augmented-ui="tl-clip br-clip border">
+            <canvas data-anim={id} role="img" aria-label={animation}></canvas>
+          </figure>
+        )}
+        <div class="abstract">
+          <h2>Abstract</h2>
+          <slot name="abstract" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap paper-layout">
+    <nav class="toc" aria-label="On this page">
+      <ol>
+        {p.video && <li><a href="#video">Video</a></li>}
+        {sections.map((s) => <li><a href={`#${s.id}`}>{s.label}</a></li>)}
+        <li><a href="#cite">Cite</a></li>
+      </ol>
+    </nav>
+    <article class="paper-body">
+      {p.video && (
+        <section class="psec" id="video">
+          <h2>Video</h2>
+          <figure class="video">
+            <a class="video__poster" data-augmented-ui="tl-clip br-clip border" href={`https://www.youtube.com/watch?v=${p.video.youtube}`} data-youtube={p.video.youtube} data-title={p.video.title} aria-label={`Play video: ${p.video.title}`}>
+              <img src={`/img/video/${p.video.youtube}.jpg`} alt="" width="1280" height="720" loading="lazy" decoding="async" />
+              <span class="video__play" data-augmented-ui="tl-clip br-clip" aria-hidden="true"><svg viewBox="0 0 22 24"><path d="M0 0 22 12 0 24Z" fill="currentColor" /></svg></span>
+            </a>
+            <figcaption><a href={`https://www.youtube.com/watch?v=${p.video.youtube}`}>{p.video.channel} on YouTube</a></figcaption>
+          </figure>
+        </section>
+      )}
+      <slot />
+      <section class="psec" id="cite">
+        <h2>Cite</h2>
+        <div class="cite" data-augmented-ui="tr-clip bl-clip border">
+          <pre id="bibtex">{p.bibtex}</pre>
+          <button class="btn" type="button" data-copy-from="bibtex" data-augmented-ui="tl-clip br-clip border">Copy BibTeX</button>
+        </div>
+      </section>
+      <nav class="pager" aria-label="More papers">
+        {prev && <a class="prev" href={`/papers/${prev.id}/`}><small>Previous paper</small><b>{prev.title}</b></a>}
+        {next && <a class={`next${prev ? '' : ' solo'}`} href={`/papers/${next.id}/`}><small>Next paper</small><b>{next.title}</b></a>}
+      </nav>
+    </article>
+  </div>
+</Base>
+
+<script>
+  import { PaperAnim } from '../scripts/anim/paper-anim';
+  for (const cv of document.querySelectorAll<HTMLCanvasElement>('canvas[data-anim]')) new PaperAnim(cv, cv.dataset.anim).start();
+</script>

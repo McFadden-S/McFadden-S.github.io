@@ -1,0 +1,44 @@
+---
+import Base from '../layouts/Base.astro';
+import { repos, repoStats } from '../data/repos';
+import { byId } from '../data/papers';
+
+const intro = 'Links to relevant research repositories I have worked on.';
+const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+---
+<Base title="Repositories" description={intro} active="repositories">
+  <div class="wrap">
+    <header class="page-head">
+      <h1 class="wide">Repositories</h1>
+      <p>{intro}</p>
+    </header>
+
+    <ul class="pubs">
+      {repos.map((r) => {
+        const s = repoStats[r.slug];
+        const paper = r.paper ? byId[r.paper] : undefined;
+        const url = `https://github.com/${r.slug}`;
+        return (
+          <li class="pub repo">
+            <div class="pub__meta">
+              {s?.language && <span class="repo__lang">{s.language}</span>}
+              {s && <span class="repo__stats">{count(s.stars, 'star')}{s.forks > 0 && `, ${count(s.forks, 'fork')}`}</span>}
+            </div>
+            <div>
+              <h2 class="pub__title"><a href={url}>{r.name}</a></h2>
+              <p class="repo__slug">{r.slug}</p>
+              <p class="repo__desc">{r.description}</p>
+              <ul class="repo__topics" aria-label="Topics">
+                {r.topics.map((t) => <li>{t}</li>)}
+              </ul>
+              <div class="pub__links">
+                <a href={url}>GitHub</a>
+                {paper && paper.page !== false && <a class="explain" href={`/papers/${paper.id}/`}>TL;DR</a>}
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+</Base>

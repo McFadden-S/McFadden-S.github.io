@@ -1,0 +1,53 @@
+---
+import Base from '../layouts/Base.astro';
+import PubRow from '../components/PubRow.astro';
+import { papers, TYPE_LABEL, type PaperType } from '../data/papers';
+
+const types = Object.keys(TYPE_LABEL) as PaperType[];
+const years = [...new Set(papers.map((p) => p.year))].sort((a, b) => b - a);
+---
+<Base title="Publications" active="publications">
+  <div class="wrap">
+    <header class="page-head">
+      <h1 class="wide">Publications</h1>
+    </header>
+
+    <div class="filters" role="group" aria-label="Filter by type">
+      <button class="filter" type="button" data-filter="all" aria-pressed="true">All<span class="n">{papers.length}</span></button>
+      {types.map((t) => (
+        <button class="filter" type="button" data-filter={t} aria-pressed="false">
+          {TYPE_LABEL[t]}<span class="n">{papers.filter((p) => p.type === t).length}</span>
+        </button>
+      ))}
+    </div>
+    <p class="key" aria-label="Venue tag key">
+      {types.map((t) => <span><i class="livery" data-type={t} style="padding:0;width:14px;height:14px"></i>{TYPE_LABEL[t]}</span>)}
+    </p>
+
+    {years.map((y) => (
+      <section class="year-block" data-year={y}>
+        <ul class="pubs">
+          {papers.filter((p) => p.year === y).map((p) => <PubRow paper={p} />)}
+        </ul>
+      </section>
+    ))}
+  </div>
+</Base>
+
+<script>
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+  const rows = [...document.querySelectorAll<HTMLElement>('.pub')];
+  const blocks = [...document.querySelectorAll<HTMLElement>('.year-block')];
+  for (const b of buttons) {
+    b.addEventListener('click', () => {
+      const f = b.dataset.filter;
+      buttons.forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      rows.forEach((r) => (r.hidden = f !== 'all' && r.dataset.type !== f));
+      blocks.forEach((bl) => (bl.hidden = ![...bl.querySelectorAll<HTMLElement>('.pub')].some((r) => !r.hidden)));
+    });
+  }
+</script>
+
+<style>
+  .year-block + .year-block .pubs { border-top: 0; }
+</style>

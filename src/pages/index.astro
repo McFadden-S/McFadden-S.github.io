@@ -1,0 +1,143 @@
+---
+import Base from '../layouts/Base.astro';
+import PubRow from '../components/PubRow.astro';
+import { profile, news, cv } from '../data/site';
+import { papers, withPage, PAGE_LINKS, related } from '../data/papers';
+
+const nodes = withPage.map((p) => ({
+  id: p.id,
+  label: p.short,
+  sub: `${p.abbr} ${p.year}`,
+  href: `/papers/${p.id}/`,
+  title: p.title,
+  topic: p.topic,
+  degree: related(p.id).length,
+  type: p.type,
+  year: p.year,
+  abbr: p.abbr,
+  related: related(p.id).map((r) => r.short),
+}));
+const selected = papers.filter((p) => p.selected);
+const fmtDate = (d: string) =>
+  new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+---
+<Base>
+  <section class="cyber" aria-label="Research map: one tower per paper">
+    <canvas></canvas>
+    <div class="cy-labels"></div>
+    <aside class="cy-card" aria-hidden="true" hidden>
+      <canvas class="cy-card__anim"></canvas>
+      <p class="cy-card__meta"><span class="livery"></span><span class="cy-card__year"></span></p>
+      <p class="cy-card__title"></p>
+      <p class="cy-card__label">Related to</p>
+      <ul class="cy-card__related"></ul>
+    </aside>
+    <div class="cyber__overlay">
+      <div class="wrap">
+        <div>
+          <h1 class="cyber__name wide"><span data-decode="800">Shae</span><span data-decode="1100">McFadden</span></h1>
+          <p class="cyber__hint">Drag to turn the city. Each tower is a paper; select one to open it.</p>
+        </div>
+        <p class="cyber__aff"><b>{profile.subtitle}</b>{profile.moreInfo[0]}<br />{profile.moreInfo[1]}</p>
+      </div>
+    </div>
+    <script type="application/json" id="cy-nodes" set:html={JSON.stringify(nodes)} />
+    <script type="application/json" id="cy-links" set:html={JSON.stringify(PAGE_LINKS)} />
+  </section>
+
+  <section class="band" id="about">
+    <div class="wrap">
+      <div class="band__head">
+        <h2 class="band__title wide">About</h2>
+      </div>
+      <div class="about">
+        <figure class="portrait"><img src="/img/profile_pic.jpeg" alt={profile.name} width="594" height="675" decoding="async" /></figure>
+        <div>
+          <div class="about__bio">
+            {profile.bio.map((p) => <p>{p}</p>)}
+          </div>
+          <div class="links-inline">
+            {profile.social.map((s) => <a href={s.href}>{s.label}</a>)}
+            <a href={`mailto:${profile.email}`}>{profile.email}</a>
+          </div>
+          <div class="about__grid">
+            <div>
+              <h3>Education</h3>
+              <ul>{cv.education.map((e) => <li>{e.title}<span>{e.institution}, {e.year}</span></li>)}</ul>
+            </div>
+            <div>
+              <h3>Experience</h3>
+              <ul>{cv.experience.map((e) => <li>{e.title}<span>{e.institution}, {e.year}</span></li>)}</ul>
+            </div>
+            {cv.interests.map((g) => (
+              <div>
+                <h3>{g.title.replace(/\.$/, '')}</h3>
+                <ul>{g.items.map((i) => <li>{i}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="research">
+    <div class="wrap">
+      <div class="band__head">
+        <h2 class="band__title wide">Selected publications</h2>
+        <p class="band__note">Every paper has its own page, explained in the paper's own words with diagrams and the results it reports. <a href="/publications/">See all publications</a>.</p>
+      </div>
+      <ul class="pubs">
+        {selected.map((p) => <PubRow paper={p} />)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="news">
+    <div class="wrap">
+      <div class="band__head">
+        <h2 class="band__title wide">News</h2>
+      </div>
+      <ul class="news">
+        {news.map((n) => (
+          <li>
+            <time datetime={n.date}>{fmtDate(n.date)}</time>
+            <p>{n.paper ? <a href={`/papers/${n.paper}/`}>{n.text}</a> : n.text}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { LinkedCity, type CityNode } from '../scripts/linkedcity';
+  import { PaperAnim } from '../scripts/anim/paper-anim';
+  type Node = CityNode & { type: string; year: number; abbr: string; related: string[] };
+  const host = document.querySelector<HTMLElement>('.cyber')!;
+  const nodes: Node[] = JSON.parse(document.getElementById('cy-nodes')!.textContent || '[]');
+  const links: [string, string][] = JSON.parse(document.getElementById('cy-links')!.textContent || '[]');
+  const card = host.querySelector<HTMLElement>('.cy-card')!;
+  const anim = new PaperAnim(card.querySelector<HTMLCanvasElement>('.cy-card__anim')!);
+  const showCard = (id: string | null) => {
+    const n = nodes.find((m) => m.id === id);
+    card.hidden = !n;
+    if (!n) return anim.stop();
+    anim.set(n.id);
+    anim.start();
+    const tag = card.querySelector<HTMLElement>('.livery')!;
+    tag.dataset.type = n.type;
+    tag.textContent = n.abbr;
+    card.querySelector('.cy-card__year')!.textContent = String(n.year);
+    card.querySelector('.cy-card__title')!.textContent = n.title ?? n.label;
+    const list = card.querySelector('.cy-card__related')!;
+    list.replaceChildren(...n.related.map((r) => Object.assign(document.createElement('li'), { textContent: r })));
+  };
+  new LinkedCity({
+    canvas: host.querySelector('canvas')!,
+    labels: host.querySelector<HTMLElement>('.cy-labels')!,
+    nodes,
+    links,
+    onHover: showCard,
+  });
+</script>

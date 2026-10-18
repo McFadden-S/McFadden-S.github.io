@@ -1,0 +1,51 @@
+---
+import type { Paper } from '../data/papers';
+import { ME } from '../data/papers';
+
+interface Props {
+  paper: Paper;
+}
+const { paper: p } = Astro.props;
+const LIMIT = 8;
+const shown = p.authors.length > LIMIT ? p.authors.slice(0, 6) : p.authors;
+const hidden = p.authors.length > LIMIT ? p.authors.slice(6) : [];
+const fmt = (a: string) => a;
+const href = p.page === false ? p.links[0]?.href : `/papers/${p.id}/`;
+---
+<li class="pub" id={`pub-${p.id}`} data-type={p.type}>
+  <div class="pub__meta">
+    <span class="pub__year">{p.year}</span>
+    <span class="livery" data-type={p.type}>{p.abbr}</span>
+  </div>
+  <div>
+    <h3 class="pub__title"><a href={href}>{p.title}</a></h3>
+    <p class="pub__authors">
+      {shown.map((a, i) => (
+        <>{a === ME ? <span class="me">{fmt(a)}</span> : fmt(a)}{i < shown.length - 1 || hidden.length ? ', ' : ''}</>
+      ))}
+      {hidden.length > 0 && (
+        <>
+          <span id={`more-${p.id}`} hidden>
+            {hidden.map((a, i) => <>{a === ME ? <span class="me">{a}</span> : a}{i < hidden.length - 1 ? ', ' : ''}</>)}
+          </span>
+          <button class="more" type="button" data-toggle={`more-${p.id}`} data-hide-self>and {hidden.length} more authors</button>
+        </>
+      )}
+    </p>
+    <p class="pub__venue">{p.venue}</p>
+    <div class="pub__links">
+      {p.page !== false && <a class="explain" href={`/papers/${p.id}/`}>TL;DR</a>}
+      {p.links.map((l) => <a href={l.href}>{l.label}</a>)}
+      <button type="button" data-toggle={`bib-${p.id}`} aria-expanded="false" aria-controls={`bib-${p.id}`}>BibTeX</button>
+    </div>
+    <div class="pub__bib cite" id={`bib-${p.id}`} data-augmented-ui="tr-clip bl-clip border" hidden>
+      <pre id={`bibtext-${p.id}`}>{p.bibtex}</pre>
+      <button class="btn" type="button" data-copy-from={`bibtext-${p.id}`} data-augmented-ui="tl-clip br-clip border">Copy</button>
+    </div>
+  </div>
+</li>
+
+<style>
+  .more { background: none; border: 0; padding: 0; color: var(--bone); cursor: pointer; text-decoration: underline; text-decoration-color: var(--smoke-2); text-underline-offset: 0.25em; font-size: inherit; }
+  .more:hover { color: var(--red); }
+</style>

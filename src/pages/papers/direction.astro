@@ -1,0 +1,1060 @@
+---
+import Paper from '../../layouts/Paper.astro';
+const sections = [
+  { id: 'introduction', label: 'Introduction' },
+  { id: 'background', label: 'Background' },
+  { id: 'methodology', label: 'Methodology' },
+  { id: 'systematization', label: 'Systematization' },
+  { id: 'pain-points', label: 'Pain points' },
+  { id: 'trends', label: 'Overall trends' },
+  { id: 'checklist', label: 'Preflight checklist' },
+  { id: 'agents', label: 'Age of agents' },
+  { id: 'conclusion', label: 'Conclusion' },
+];
+---
+<Paper id="direction" affils={['University College London', 'The Alan Turing Institute', 'King’s College London', 'University of Southampton']} sections={sections}>
+  <Fragment slot="abstract">
+    <p>Security vulnerabilities in software can have severe consequences; however, manual vulnerability detection is costly and does not scale, especially as agentic coding frameworks increase the rate of code production. Over the last decade, a large body of research has applied machine learning to automate vulnerability detection (ML4AVD), yet self-reported performance on the most popular datasets shows no clear upward trend. The ML4AVD research community has identified several flaws in problem formulations, datasets, and metrics, but these are discussed in isolation, leaving the overarching problems that generate and reinforce these flaws unaddressed. We first systematize the field through a survey of 87 highly-cited influential works based on their problem formulation, input and detection granularity, target programming languages, evaluation metrics, datasets, and detection approach. Drawing on this corpus and prior empirical work, we identify twelve pain points spanning the ML4AVD pipeline and show that they are co-occurring and mutually reinforcing: feedback loops between datasets, formulations, baselines, and metrics perpetuate each other and explain the field’s persistent concentration on binary classification of C/C++ vulnerabilities at the function level. Thus, the field optimizes for a narrow and artificial problem that omits vulnerability type prediction, broader language support, and separation of input from detection granularity. We pair each pain point with concrete recommendations to break these loops. Finally, we use AIxCC as a case study to assess how well a recent high-profile effort aligns with these recommendations and reflect on the relevance of ML4AVD in the era of agentic AI.</p>
+  </Fragment>
+
+  <section class="psec" id="introduction">
+    <h2>Introduction</h2>
+    <div class="prose">
+      <p>Traditionally, vulnerability detection relied on manual code reviews and security audits, both labor-intensive and time-consuming practices. However, in the past decade, researchers have developed increasingly sophisticated approaches to automate this process. <span class="term">Automated Vulnerability Detection</span> (AVD) now represents a potentially transformative advancement in software security, aiming to identify and support the remediation of security flaws within codebases.</p>
+      <p>AVD approaches have evolved from rule-based methods to machine learning-based solutions (ML4AVD), including deep learning and large language model (LLM)-driven techniques that now dominate more recent literature. Despite this sustained effort, the self-reported performance of ML4AVD solutions does not exhibit a clear upward trend.</p>
+    </div>
+
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Dataset</th><th class="n wrap">Theil–Sen slope of F1 per year</th><th class="n">95% CI</th></tr></thead>
+      <tbody>
+        <tr><td>Devign / CodeXGLUE</td><td class="n">0.003</td><td class="n">[−0.016, 0.021]</td></tr>
+        <tr><td>ReVeal</td><td class="n">0.013</td><td class="n">[−0.054, 0.068]</td></tr>
+        <tr><td>Big-Vul</td><td class="n">0.002</td><td class="n">[−0.275, 0.089]</td></tr>
+      </tbody>
+    </table></div>
+    <p class="footnote">Appendix A. The results show that even self-reported performances for each dataset do not exhibit a clear upward trend as the confidence intervals for all three datasets include 0. Of the 87 articles reviewed in our survey, 28 reported the F1-score on at least one of the aforementioned datasets.</p>
+
+    <div class="prose" style="margin-top:28px">
+      <p>This demonstrates that even when working with the same dataset, measuring progress between papers is difficult as they apply different pre-processing steps and evaluation methodologies. More fundamentally, the ML4AVD field has become increasingly siloed, with studies often focused on isolated tasks and a narrow range of languages. A key driver is the disproportionate influence of a small number of highly cited works that shape the choices of subsequent research: which datasets to use, which problem formulations to adopt, and which evaluation protocols to follow.</p>
+    </div>
+
+    <blockquote class="excerpt">
+      <p>Consequently, flawed assumptions embedded in foundational ML4AVD work are uncritically adopted by follow-up work and are propagated widely through the literature.</p>
+    </blockquote>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Research question</span><p>What are the key limitations of ML4AVD research that emerge from highly cited papers in the field, how do they interact, and what do they imply for future work?</p></div>
+
+    <div class="prose">
+      <p>Many of these issues have been raised individually in prior work, but their dissemination through the ML4AVD community is uneven, and their interactions remain underexplored. Our contribution is an integrated diagnosis: we show that the pain points are co-occurring and mutually reinforcing, that the feedback loops between them explain the state of the field better than any individual limitation, and that targeted fixes are therefore insufficient without breaking those loops.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="background">
+    <h2>Background</h2>
+
+    <h3>Vulnerability Management Life Cycle</h3>
+    <div class="prose">
+      <p>Vulnerability detection does not exist in isolation; it is the first stage in a broader vulnerability management life cycle. This life cycle mirrors industry standards such as ISO 30111 and NIST SP 800-61.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x dg-wide">
+      <svg class="dg" viewBox="0 0 600 300" role="img" aria-label="The five-stage vulnerability management life cycle. Most ML4AVD papers output only a binary vulnerable or not label, while later stages need the vulnerability type for triage, affected lines for repair, and trigger conditions and code paths for exploitation.">
+        <defs>
+          <marker id="ah-life" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-life-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="box-solid" d="M26 14H176V44L166 54H16V24Z"/>
+        <text class="t-b t-on-red mid" x="96" y="39">Detection</text>
+        <path class="box" d="M26 72H176V102L166 112H16V82Z"/>
+        <text class="mid" x="96" y="97">Triage</text>
+        <path class="box" d="M26 130H176V160L166 170H16V140Z"/>
+        <text class="mid" x="96" y="155">Exploitation</text>
+        <path class="box" d="M26 188H176V218L166 228H16V198Z"/>
+        <text class="mid" x="96" y="213">Repair</text>
+        <path class="box" d="M26 246H176V276L166 286H16V256Z"/>
+        <text class="mid" x="96" y="271">Validation &amp; testing</text>
+
+        <path class="ln" d="M40 54 V68" marker-end="url(#ah-life)"/>
+        <text class="t-sm t-ink2" x="50" y="67">findings</text>
+        <path class="ln" d="M40 112 V126" marker-end="url(#ah-life)"/>
+        <text class="t-sm t-ink2" x="50" y="125">prioritized list</text>
+        <path class="ln" d="M40 170 V184" marker-end="url(#ah-life)"/>
+        <text class="t-sm t-ink2" x="50" y="183">exploit, test case</text>
+        <path class="ln" d="M40 228 V242" marker-end="url(#ah-life)"/>
+        <text class="t-sm t-ink2" x="50" y="241">patch</text>
+
+        <path class="ln" d="M176 30 H296" marker-end="url(#ah-life)"/>
+        <text class="t-sm t-muted mid" x="238" y="24">binary label</text>
+        <path class="box-dash" d="M310 14H584V54L574 64H300V24Z"/>
+        <text class="t-mono t-muted" x="316" y="33">MOST ML4AVD PAPERS</text>
+        <text x="316" y="53">vulnerable / not vulnerable</text>
+
+        <path class="ln-red" d="M176 46 H206 V160 H296" marker-end="url(#ah-life-red)"/>
+        <text class="t-sm t-red" x="212" y="110">rich context</text>
+        <path class="box-red" d="M310 96H584V236L574 246H300V106Z"/>
+        <text class="t-mono t-red" x="316" y="118">WHAT LATER STAGES NEED</text>
+        <text x="316" y="146">Vulnerability type (CWE-ID)</text>
+        <text class="t-sm t-muted end" x="572" y="146">triage</text>
+        <text x="316" y="172">Affected code lines</text>
+        <text class="t-sm t-muted end" x="572" y="172">repair</text>
+        <text x="316" y="198">Trigger conditions</text>
+        <text class="t-sm t-muted end" x="572" y="198">exploitation</text>
+        <text x="316" y="224">Code paths</text>
+        <text class="t-sm t-muted end" x="572" y="224">exploitation</text>
+      </svg>
+      </div>
+      <svg class="dg dg-tall" viewBox="0 0 340 316" role="img" aria-label="The five-stage vulnerability management life cycle. Most ML4AVD papers output only a binary vulnerable or not label, while later stages need the vulnerability type for triage, affected lines for repair, and trigger conditions and code paths for exploitation.">
+        <defs>
+          <marker id="ah-life-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-life-red-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="box-solid" d="M16 8H130V34L120 44H6V18Z"/>
+        <text class="t-b t-on-red mid" x="68" y="31">Detection</text>
+        <path class="ln" d="M26 44 V70" marker-end="url(#ah-life-t)"/>
+        <text class="t-sm t-ink2" x="34" y="62">findings</text>
+        <path class="box" d="M16 74H130V100L120 110H6V84Z"/>
+        <text class="mid" x="68" y="97">Triage</text>
+        <path class="ln" d="M26 110 V136" marker-end="url(#ah-life-t)"/>
+        <text class="t-sm t-ink2" x="34" y="128">prioritized list</text>
+        <path class="box" d="M16 140H130V166L120 176H6V150Z"/>
+        <text class="mid" x="68" y="163">Exploitation</text>
+        <path class="ln" d="M26 176 V202" marker-end="url(#ah-life-t)"/>
+        <text class="t-sm t-ink2" x="34" y="194">exploit, test case</text>
+        <path class="box" d="M16 206H130V232L120 242H6V216Z"/>
+        <text class="mid" x="68" y="229">Repair</text>
+        <path class="ln" d="M26 242 V268" marker-end="url(#ah-life-t)"/>
+        <text class="t-sm t-ink2" x="34" y="260">patch</text>
+        <path class="box" d="M16 272H130V298L120 308H6V282Z"/>
+        <text class="mid" x="68" y="295">Validation &amp; testing</text>
+        <path class="ln" d="M130 22 H148" marker-end="url(#ah-life-t)"/>
+        <path class="box-dash" d="M162 4H334V46L324 56H152V14Z"/>
+        <text class="t-mono t-muted" x="164" y="24">MOST ML4AVD PAPERS</text>
+        <text x="164" y="44">vulnerable / not vulnerable</text>
+        <path class="ln-red" d="M130 36 H140 V100 H148" marker-end="url(#ah-life-red-t)"/>
+        <path class="box-red" d="M162 74H334V258L324 268H152V84Z"/>
+        <text class="t-mono t-red" x="164" y="96">WHAT LATER STAGES NEED</text>
+        <text x="164" y="120">Vulnerability type (CWE-ID)</text>
+        <text class="t-sm t-muted" x="164" y="135">triage</text>
+        <text x="164" y="160">Affected code lines</text>
+        <text class="t-sm t-muted" x="164" y="175">repair</text>
+        <text x="164" y="200">Trigger conditions</text>
+        <text class="t-sm t-muted" x="164" y="215">exploitation</text>
+        <text x="164" y="240">Code paths</text>
+        <text class="t-sm t-muted" x="164" y="255">exploitation</text>
+      </svg>
+      <figcaption><b>The stages of the vulnerability management life cycle.</b> Beyond a binary signal, detection can also provide the vulnerability type (e.g., CWE-ID), the affected code locations, the conditions under which the vulnerability is triggered, and the relevant code paths. This contextual information supports the subsequent stages of the vulnerability management life cycle.</figcaption>
+    </figure>
+
+    <ol class="steps">
+      <li><div><h4>Detection</h4><p>Identifying vulnerable code within the codebase. The utility of detection depends not only on whether a vulnerability is found but also on the richness of the information provided.</p></div></li>
+      <li><div><h4>Triage</h4><p>Prioritizing detected vulnerabilities based on their likely impact and urgency. Effective triage requires more than a binary detection signal, as severity depends on contextual factors such as vulnerability type, affected assets, reachability, exploitability, and potential “blast radius”.</p></div></li>
+      <li><div><h4>Exploitation</h4><p>Validating the existence of a vulnerability by constructing a reproducible exploit. Although significantly more costly than detection, the exploitation phase eliminates false positives and yields a reusable test case to validate subsequent repair.</p></div></li>
+      <li><div><h4>Repair</h4><p>Applying a patch to remediate the vulnerability while preserving existing functionality. Detection informs repair by localizing the affected code, while exploitation provides the test cases needed to verify that the repair is effective.</p></div></li>
+      <li><div><h4>Validation &amp; Testing</h4><p>Confirming that the patch has been applied successfully. Ensures that the vulnerability has been removed without degrading application functionality or introducing new vulnerabilities.</p></div></li>
+    </ol>
+
+    <h3>Program Analysis</h3>
+    <div class="prose">
+      <p>Vulnerability detection is a branch of program analysis, the process of determining a program’s properties. However, static analysis of complex programs can be computationally expensive, and determining statically whether an arbitrary program is free of vulnerabilities is undecidable. Therefore, static AVD methods require approximation to be practical, leading to diverse approaches with different trade-offs. As universal approximators, neural networks have been increasingly applied to this setting.</p>
+    </div>
+
+    <h3>Program Representation</h3>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Input and output granularity</h4><p>ML4AVD solutions typically take a code snippet, the size and complexity of which determine the input granularity, to produce information about the presence and location of vulnerabilities; the level of detail at which solutions label the location of vulnerabilities determines the output granularity. In the literature, input and output granularities range from the project-level (the coarsest) to line-level (the finest).</p></div>
+      <div class="card"><h4>Program slices</h4><p>Subsets of code, possibly non-contiguous, that preserve the behavior of the full program with respect to a specified slicing criterion, such as the value of a variable at a particular program functionality. In the context of AVD, slicing is used as a preliminary step to simplify further analysis by excluding unrelated code in the resulting feature space.</p></div>
+      <div class="card"><h4>Vectorization</h4><p>A numeric representation of source code so it can be used as input to ML-based AVD solutions. In recent research, the most prevalent vectorization method is generating embeddings at the word, sub-word, or sentence level to capture code semantics.</p></div>
+      <div class="card"><h4>Intermediate representations (IRs)</h4><p>Compiler-oriented abstractions of source code, developed to support program analysis and optimization, that are now widely used beyond compilation. Code property graphs (CPG) combine information from the AST, CFG, and PDG into a single structure.</p></div>
+    </div>
+
+    <h3>ML Approaches used for AVD</h3>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Convolutional Neural Networks (CNN)</h4><p>Neural networks developed for grid-like data (e.g., images). CNNs apply learnable filters (called kernels) to sliding windows of the data and match patterns through a convolution operation.</p></div>
+      <div class="card"><h4>Recurrent Neural Networks (RNN)</h4><p>Neural networks designed primarily for sequential data. The core component of an RNN is the recurrent cell. It keeps a hidden state summarizing past inputs, enabling RNNs to learn what information to retain or forget.</p></div>
+      <div class="card"><h4>Graph Neural Networks (GNN)</h4><p>Neural networks that support learning from graph structures, where the information of each node is represented as a vector. GNNs can be applied to graphs irrespective of their dimensions (e.g., the number of nodes or edges).</p></div>
+      <div class="card"><h4>Large Language Models (LLM)</h4><p>Transformer-based neural networks that model natural language with a high number of parameters, from hundreds of millions to trillions. LLMs can be general purpose (e.g., ChatGPT) or specialized in a field (e.g., CodeBERT).</p></div>
+    </div>
+  </section>
+
+  <section class="psec" id="methodology">
+    <h2>Methodology</h2>
+    <div class="prose">
+      <p>Our methodology is designed to capture work that has had measurable influence on the field, rather than provide an exhaustive census of all AVD research. We searched four research databases that cover the vast majority of research venues in both the security and machine learning fields: IEEEXplore, ACM Digital Library, ScienceDirect, and arXiv. We applied the following search criteria: (i) The article title must include either “vulnerability detection” or “vulnerability discovery”, and (ii) The body of the article must include “software”. The cutoff is September 2024 to allow for the citation count, which we use in subsequent filtering, to stabilize.</p>
+      <p>Five reviewers screened the collected papers for topic relevance, with two reviewers per paper. Using these criteria, we reduced the selection to 395 articles and 76 empirical studies. We calculate <span class="term">citation frequency</span> R<sub>c</sub> for each article as R<sub>c</sub> = N<sub>c</sub>/A, where N<sub>c</sub> is the number of citations achieved by an article as recorded in September 2025, and A is the article’s age in years from first publication or pre-print. As cited computer science articles had a mean of five citations after one year from publication, we set a threshold of R<sub>c</sub> ≥ 5, resulting in 124 articles.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x dg-wide">
+      <svg class="dg" viewBox="0 0 600 326" role="img" aria-label="Corpus construction. 965 articles from IEEEXplore, arXiv, ACM, ScienceDirect and manual search were de-duplicated to 877, screened to 395 on-topic articles plus 76 empirical studies, filtered to 124 by citation frequency, and reduced to 87 by full-text screening.">
+        <defs>
+          <marker id="ah-funnel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-funnel-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="box" d="M26 16H184V202L174 212H16V26Z"/>
+        <text class="t-mono t-muted" x="30" y="38">SOURCES</text>
+        <text x="30" y="66">IEEEXplore</text><text class="t-code end" x="170" y="66">510</text>
+        <text x="30" y="96">arXiv</text><text class="t-code end" x="170" y="96">169</text>
+        <text x="30" y="126">ACM</text><text class="t-code end" x="170" y="126">157</text>
+        <text x="30" y="156">ScienceDirect</text><text class="t-code end" x="170" y="156">102</text>
+        <text x="30" y="186">Manual search</text><text class="t-code end" x="170" y="186">27</text>
+        <path class="ln" d="M184 36 H226" marker-end="url(#ah-funnel)"/>
+        <text class="t-sm t-muted mid" x="205" y="28">search</text>
+
+        <path class="box" d="M240 16H410V46L400 56H230V26Z"/>
+        <text class="t-lg" x="246" y="42">965</text><text x="292" y="41">collected</text>
+        <path class="ln" d="M320 56 V76" marker-end="url(#ah-funnel)"/>
+        <text class="t-sm t-ink2" x="330" y="72">Rayyan de-duplication</text>
+
+        <path class="box" d="M240 80H410V110L400 120H230V90Z"/>
+        <text class="t-lg" x="246" y="106">877</text><text x="292" y="105">unique articles</text>
+        <path class="ln" d="M320 120 V140" marker-end="url(#ah-funnel)"/>
+        <text class="t-sm t-ink2" x="330" y="136">topic screening</text>
+
+        <path class="box" d="M240 144H410V174L400 184H230V154Z"/>
+        <text class="t-lg" x="246" y="170">395</text><text x="292" y="169">on topic</text>
+        <path class="ln" d="M320 184 V204" marker-end="url(#ah-funnel)"/>
+        <text class="t-sm t-ink2" x="330" y="200">≥ 5 citations per year</text>
+
+        <path class="box" d="M240 208H410V238L400 248H230V218Z"/>
+        <text class="t-lg" x="246" y="234">124</text><text x="292" y="233">highly cited</text>
+        <path class="ln-red" d="M320 248 V268" marker-end="url(#ah-funnel-red)"/>
+        <text class="t-sm t-ink2" x="330" y="264">full-text screening</text>
+
+        <path class="box-solid" d="M240 272H410V302L400 312H230V282Z"/>
+        <text class="t-lg t-on-red" x="246" y="298">87</text><text class="t-on-red" x="292" y="297">included</text>
+
+        <path class="ln" d="M410 100 H510 V140" marker-end="url(#ah-funnel)"/>
+        <text class="t-sm t-muted mid" x="460" y="94">for discussion</text>
+        <path class="box-dash" d="M440 144H590V174L580 184H430V154Z"/>
+        <text class="t-lg" x="444" y="170">76</text><text class="t-sm" x="470" y="169">empirical studies</text>
+      </svg>
+      </div>
+      <svg class="dg dg-tall" viewBox="0 0 340 312" role="img" aria-label="Corpus construction. 965 articles from IEEEXplore, arXiv, ACM, ScienceDirect and manual search were de-duplicated to 877, screened to 395 on-topic articles plus 76 empirical studies, filtered to 124 by citation frequency, and reduced to 87 by full-text screening.">
+        <defs>
+          <marker id="ah-funnel-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-funnel-red-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="box" d="M14 8H150V178L140 188H4V18Z"/>
+        <text class="t-mono t-muted" x="16" y="30">SOURCES</text>
+        <text x="16" y="58">IEEEXplore</text><text class="t-code end" x="140" y="58">510</text>
+        <text x="16" y="86">arXiv</text><text class="t-code end" x="140" y="86">169</text>
+        <text x="16" y="114">ACM</text><text class="t-code end" x="140" y="114">157</text>
+        <text x="16" y="142">ScienceDirect</text><text class="t-code end" x="140" y="142">102</text>
+        <text x="16" y="170">Manual search</text><text class="t-code end" x="140" y="170">27</text>
+        <path class="ln" d="M150 28 H180" marker-end="url(#ah-funnel-t)"/>
+        <text class="t-sm t-muted mid" x="165" y="21">search</text>
+        <path class="box" d="M194 8H334V38L324 48H184V18Z"/>
+        <text class="t-lg" x="196" y="34">965</text><text x="236" y="33">collected</text>
+        <path class="ln" d="M200 48 V68" marker-end="url(#ah-funnel-t)"/>
+        <text class="t-sm t-ink2" x="208" y="63">Rayyan de-duplication</text>
+        <path class="box" d="M194 72H334V102L324 112H184V82Z"/>
+        <text class="t-lg" x="196" y="98">877</text><text x="236" y="97">unique articles</text>
+        <path class="ln" d="M200 112 V132" marker-end="url(#ah-funnel-t)"/>
+        <text class="t-sm t-ink2" x="208" y="127">topic screening</text>
+        <path class="box" d="M194 136H334V166L324 176H184V146Z"/>
+        <text class="t-lg" x="196" y="162">395</text><text x="236" y="161">on topic</text>
+        <path class="ln" d="M200 176 V196" marker-end="url(#ah-funnel-t)"/>
+        <text class="t-sm t-ink2" x="208" y="191">≥ 5 citations per year</text>
+        <path class="box" d="M194 200H334V230L324 240H184V210Z"/>
+        <text class="t-lg" x="196" y="226">124</text><text x="236" y="225">highly cited</text>
+        <path class="ln-red" d="M200 240 V260" marker-end="url(#ah-funnel-red-t)"/>
+        <text class="t-sm t-ink2" x="208" y="255">full-text screening</text>
+        <path class="box-solid" d="M194 264H334V294L324 304H184V274Z"/>
+        <text class="t-lg t-on-red" x="196" y="290">87</text><text class="t-on-red" x="236" y="289">included</text>
+        <path class="ln" d="M184 100 H166 V230 H154" marker-end="url(#ah-funnel-t)"/>
+        <text class="t-sm t-muted" x="6" y="203">for discussion</text>
+        <path class="box-dash" d="M14 210H150V240L140 250H4V220Z"/>
+        <text class="t-lg" x="16" y="236">76</text><text class="t-sm" x="44" y="235">empirical studies</text>
+      </svg>
+      <figcaption><b>Article collection and screening process.</b> 965 articles were collected from IEEEXplore (510), arXiv (169), ACM (157), ScienceDirect (102), and manual search (27). After de-duplication 877 remained; 76 were then classified as empirical studies, 395 were classified as relevant to the topic, of which 87 were included after full-text screening.</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>Although older articles have had more time to accrue citations, the publication-year distribution does not suggest that the citation-frequency threshold systematically favored older work. Newer surveys, datasets, and empirical studies are not included in the citation-filtered corpus. Instead, we incorporate them into the discussion where they help identify, corroborate, or refine the pain points and recommendations.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="systematization">
+    <h2>Systematization of AVD Literature</h2>
+    <div class="prose">
+      <p>To inform our discussion of identified limitations, we first characterize the 87 influential ML4AVD articles in our corpus according to six key dimensions: problem formulation, input and output granularity, programming languages, evaluation metrics, datasets, and ML approaches. For each dimension, we report the distribution of choices made across the corpus. Papers may appear in multiple categories if they meet the criteria for each category.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b class="red">86%</b><span>of articles using a binary formulation</span></div>
+      <div class="stat"><b>63%</b><span>using function-level input and output granularity</span></div>
+      <div class="stat"><b>70/82</b><span>single-language articles target C/C++</span></div>
+      <div class="stat"><b>68/87</b><span>articles use the <span class="nb">F1-score</span></span></div>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x dg-wide">
+      <svg class="dg" viewBox="0 0 600 440" role="img" aria-label="The ML4AVD pipeline in five stages, data, representation, model, output and evaluation, with the most common choice in the corpus for each: Devign as dataset and C/C++ as language, function-level input and output, graph neural networks, binary labels, and the F1-score.">
+        <defs>
+          <marker id="ah-pipe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <text class="t-mono t-muted" x="16" y="18">PIPELINE STAGE</text>
+        <text class="t-mono t-red" x="290" y="18">MOST COMMON CHOICE IN THE CORPUS</text>
+
+        <path class="box" d="M26 28H246V74L236 84H16V38Z"/>
+        <text class="t-mono t-muted" x="32" y="50">1. DATA</text>
+        <text class="t-b" x="32" y="70">Labeled code samples</text>
+        <path class="box-plain" d="M300 28H584V74L574 84H290V38Z"/>
+        <text class="t-b t-red" x="306" y="52">Devign/CodeXGLUE: 27 papers</text>
+        <text class="t-sm t-muted" x="306" y="72">C/C++ in 70 of 82 single-language papers</text>
+        <path class="ln" d="M60 84 V110" marker-end="url(#ah-pipe)"/>
+        <text class="t-sm t-ink2" x="70" y="103">code samples</text>
+
+        <path class="box" d="M26 114H246V160L236 170H16V124Z"/>
+        <text class="t-mono t-muted" x="32" y="136">2. REPRESENTATION</text>
+        <text class="t-b" x="32" y="156">Text, slices or graphs</text>
+        <path class="box-plain" d="M300 114H584V160L574 170H290V124Z"/>
+        <text class="t-b t-red" x="306" y="138">Function in, function out: 63%</text>
+        <text class="t-sm t-muted" x="306" y="158">same granularity in and out: 82%</text>
+        <path class="ln" d="M60 170 V196" marker-end="url(#ah-pipe)"/>
+        <text class="t-sm t-ink2" x="70" y="189">tokens, graphs, embeddings</text>
+
+        <path class="box" d="M26 200H246V246L236 256H16V210Z"/>
+        <text class="t-mono t-muted" x="32" y="222">3. MODEL</text>
+        <text class="t-b" x="32" y="242">CNN, RNN, GNN or LLM</text>
+        <path class="box-plain" d="M300 200H584V246L574 256H290V210Z"/>
+        <text class="t-b t-red" x="306" y="224">GNN: 33 papers (37.9%)</text>
+        <text class="t-sm t-muted" x="306" y="244">LLM: 46.2% of 2024 and 2025 papers</text>
+        <path class="ln" d="M60 256 V282" marker-end="url(#ah-pipe)"/>
+        <text class="t-sm t-ink2" x="70" y="275">prediction</text>
+
+        <path class="box" d="M26 286H246V332L236 342H16V296Z"/>
+        <text class="t-mono t-muted" x="32" y="308">4. OUTPUT</text>
+        <text class="t-b" x="32" y="328">A label at some granularity</text>
+        <path class="box-plain" d="M300 286H584V332L574 342H290V296Z"/>
+        <text class="t-b t-red" x="306" y="310">Binary label: 75 papers (86%)</text>
+        <text class="t-sm t-muted" x="306" y="330">vulnerability type (CWE-ID): 16 papers</text>
+        <path class="ln" d="M60 342 V368" marker-end="url(#ah-pipe)"/>
+        <text class="t-sm t-ink2" x="70" y="361">predicted labels</text>
+
+        <path class="box" d="M26 372H246V418L236 428H16V382Z"/>
+        <text class="t-mono t-muted" x="32" y="394">5. EVALUATION</text>
+        <text class="t-b" x="32" y="414">Metrics on a test split</text>
+        <path class="box-plain" d="M300 372H584V418L574 428H290V382Z"/>
+        <text class="t-b t-red" x="306" y="396">F1-score: 68 of 87 papers</text>
+        <text class="t-sm t-muted" x="306" y="416">PR-AUC: 2 papers</text>
+      </svg>
+      </div>
+      <svg class="dg dg-tall" viewBox="0 0 340 580" role="img" aria-label="The ML4AVD pipeline in five stages, data, representation, model, output and evaluation, with the most common choice in the corpus for each: Devign as dataset and C/C++ as language, function-level input and output, graph neural networks, binary labels, and the F1-score.">
+        <defs>
+          <marker id="ah-pipe-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <text class="t-mono t-muted" x="4" y="14">PIPELINE STAGE</text>
+        <text class="t-mono t-red" x="4" y="30">MOST COMMON CHOICE IN THE CORPUS</text>
+        <path class="box" d="M14 42H336V66L326 76H4V52Z"/>
+        <text class="t-mono t-muted" x="16" y="63">1. DATA</text>
+        <text class="t-b end" x="324" y="64">Labeled code samples</text>
+        <path class="box-plain" d="M14 82H336V116L326 126H4V92Z"/>
+        <text class="t-b t-red" x="16" y="101">Devign/CodeXGLUE: 27 papers</text>
+        <text class="t-sm t-muted" x="16" y="118">C/C++ in 70 of 82 single-language papers</text>
+        <path class="ln" d="M24 126 V150" marker-end="url(#ah-pipe-t)"/>
+        <text class="t-sm t-ink2" x="32" y="143">code samples</text>
+        <path class="box" d="M14 154H336V178L326 188H4V164Z"/>
+        <text class="t-mono t-muted" x="16" y="175">2. REPRESENTATION</text>
+        <text class="t-b end" x="324" y="176">Text, slices or graphs</text>
+        <path class="box-plain" d="M14 194H336V228L326 238H4V204Z"/>
+        <text class="t-b t-red" x="16" y="213">Function in, function out: 63%</text>
+        <text class="t-sm t-muted" x="16" y="230">same granularity in and out: 82%</text>
+        <path class="ln" d="M24 238 V262" marker-end="url(#ah-pipe-t)"/>
+        <text class="t-sm t-ink2" x="32" y="255">tokens, graphs, embeddings</text>
+        <path class="box" d="M14 266H336V290L326 300H4V276Z"/>
+        <text class="t-mono t-muted" x="16" y="287">3. MODEL</text>
+        <text class="t-b end" x="324" y="288">CNN, RNN, GNN or LLM</text>
+        <path class="box-plain" d="M14 306H336V340L326 350H4V316Z"/>
+        <text class="t-b t-red" x="16" y="325">GNN: 33 papers (37.9%)</text>
+        <text class="t-sm t-muted" x="16" y="342">LLM: 46.2% of 2024 and 2025 papers</text>
+        <path class="ln" d="M24 350 V374" marker-end="url(#ah-pipe-t)"/>
+        <text class="t-sm t-ink2" x="32" y="367">prediction</text>
+        <path class="box" d="M14 378H336V402L326 412H4V388Z"/>
+        <text class="t-mono t-muted" x="16" y="399">4. OUTPUT</text>
+        <text class="t-b end" x="324" y="400">A label at some granularity</text>
+        <path class="box-plain" d="M14 418H336V452L326 462H4V428Z"/>
+        <text class="t-b t-red" x="16" y="437">Binary label: 75 papers (86%)</text>
+        <text class="t-sm t-muted" x="16" y="454">vulnerability type (CWE-ID): 16 papers</text>
+        <path class="ln" d="M24 462 V486" marker-end="url(#ah-pipe-t)"/>
+        <text class="t-sm t-ink2" x="32" y="479">predicted labels</text>
+        <path class="box" d="M14 490H336V514L326 524H4V500Z"/>
+        <text class="t-mono t-muted" x="16" y="511">5. EVALUATION</text>
+        <text class="t-b end" x="324" y="512">Metrics on a test split</text>
+        <path class="box-plain" d="M14 530H336V564L326 574H4V540Z"/>
+        <text class="t-b t-red" x="16" y="549">F1-score: 68 of 87 papers</text>
+        <text class="t-sm t-muted" x="16" y="566">PR-AUC: 2 papers</text>
+      </svg>
+      <figcaption><b>The most common choice at each stage.</b> The cumulative effect is a field that optimizes for a narrow and artificial task while neglecting several properties practical ML4AVD requires: predicting vulnerability type rather than mere existence, broader language coverage, and the decoupling of contextual input from fine-grained detection output.</figcaption>
+    </figure>
+
+    <h3>Six key dimensions</h3>
+    <div class="explorer">
+      <div class="ex-tabs" aria-label="Corpus dimensions">
+        <button class="ex-tab" aria-controls="cx-form" aria-selected="true">Formulation</button>
+        <button class="ex-tab" aria-controls="cx-gran">Granularity</button>
+        <button class="ex-tab" aria-controls="cx-lang">Language</button>
+        <button class="ex-tab" aria-controls="cx-data">Datasets</button>
+        <button class="ex-tab" aria-controls="cx-model">Model</button>
+        <button class="ex-tab" aria-controls="cx-metric">Metrics</button>
+      </div>
+      <div>
+        <div class="ex-panel" id="cx-form" data-augmented-ui="tl-clip br-clip border">
+          <h4>Problem Formulation</h4>
+          <p>All studied articles viewed AVD as a classification problem, with two prevalent formulations. (i) Binary: the ML4AVD solution returns whether the input software is vulnerable or not, without specifying the vulnerability type. (ii) CWE-ID: the ML4AVD solution returns the type of vulnerability (often represented by the Common Weakness Enumeration identifier, or CWE-ID) to which the input software is vulnerable, if any.</p>
+          <p>The binary formulation dominates the literature with 86% of the included articles. However, this dominance is not uniform over time, as CWE-based formulations become more prevalent starting in 2022, suggesting an emerging shift toward more informative problem formulations in more recent work.</p>
+          <div class="chart">
+            <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Most common choice</span><span><i class="sw-n"></i>Alternative</span></div>
+            <div class="hb" role="list" style="--max:80; --label-w:8rem">
+              <div class="hb-row" role="listitem" data-tip="Binary classification|75 of 87 papers (86%)" aria-label="Binary classification: 75 papers">
+                <span class="hb-label">Binary</span>
+                <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:75"></span></span>
+                <span class="hb-val hi">75</span>
+              </div>
+              <div class="hb-row" role="listitem" data-tip="CWE-ID classification|16 of 87 papers|10 of them from 2023 or later" aria-label="CWE-ID classification: 16 papers">
+                <span class="hb-label">CWE-ID</span>
+                <span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:16"></span></span>
+                <span class="hb-val">16</span>
+              </div>
+            </div>
+            <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">20</span><span style="left:50%">40</span><span style="left:75%">60</span><span style="left:100%">80</span></div><span class="sp"></span></div>
+            <div class="chart-foot">
+              <span>Articles, Table 1. Articles using both formulations are counted in each.</span>
+              <details class="chart-table"><summary>Show as table</summary>
+                <div class="table-wrap"><table class="data-table">
+                  <thead><tr><th>Formulation</th><th class="n">Articles</th></tr></thead>
+                  <tbody><tr class="hl"><td>Binary classification</td><td class="n">75</td></tr><tr><td>CWE-ID classification</td><td class="n">16</td></tr></tbody>
+                </table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="ex-panel" id="cx-gran" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Input and Output Granularity</h4>
+          <p>A vast majority (63%) of the solutions provided function-level labeling of function-level inputs. Beyond the function-level, this same-to-same relationship between input and output extends to other granularities, accounting for 82% of all configurations. Two notable articles use the coarsest input granularity, project-level, paired with the finest output granularity, line-level. Project-level inputs are predominantly associated with slice-level outputs, demonstrating the use of program slicing to refine the granularity of the code.</p>
+          <div class="chart">
+            <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Same-to-same</span><span><i class="sw-n"></i>Cross-granularity</span></div>
+            <div class="hb" role="list" style="--max:60; --label-w:9.5rem">
+              <div class="hb-row" role="listitem" data-tip="Function-to-function|55 articles" aria-label="Function to function: 55 articles"><span class="hb-label">Function-to-Function</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:55"></span></span><span class="hb-val hi">55</span></div>
+              <div class="hb-row" role="listitem" data-tip="Project-to-slice|6 articles" aria-label="Project to slice: 6 articles"><span class="hb-label">Project-to-Slice</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:6"></span></span><span class="hb-val">6</span></div>
+              <div class="hb-row" role="listitem" data-tip="Slice-to-slice|6 articles" aria-label="Slice to slice: 6 articles"><span class="hb-label">Slice-to-Slice</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:6"></span></span><span class="hb-val">6</span></div>
+              <div class="hb-row" role="listitem" data-tip="Snippet-to-snippet|5 articles" aria-label="Snippet to snippet: 5 articles"><span class="hb-label">Snippet-to-Snippet</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:5"></span></span><span class="hb-val">5</span></div>
+              <div class="hb-row" role="listitem" data-tip="Function-to-line|4 articles" aria-label="Function to line: 4 articles"><span class="hb-label">Function-to-Line</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:4"></span></span><span class="hb-val">4</span></div>
+              <div class="hb-row" role="listitem" data-tip="Commit-to-commit|3 articles" aria-label="Commit to commit: 3 articles"><span class="hb-label">Commit-to-Commit</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:3"></span></span><span class="hb-val">3</span></div>
+              <div class="hb-row" role="listitem" data-tip="Function-to-slice|3 articles" aria-label="Function to slice: 3 articles"><span class="hb-label">Function-to-Slice</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:3"></span></span><span class="hb-val">3</span></div>
+              <div class="hb-row" role="listitem" data-tip="Project-to-project|2 articles" aria-label="Project to project: 2 articles"><span class="hb-label">Project-to-Project</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:2"></span></span><span class="hb-val">2</span></div>
+              <div class="hb-row" role="listitem" data-tip="Project-to-line|2 articles" aria-label="Project to line: 2 articles"><span class="hb-label">Project-to-Line</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:2"></span></span><span class="hb-val">2</span></div>
+              <div class="hb-row" role="listitem" data-tip="Function-to-snippet|2 articles" aria-label="Function to snippet: 2 articles"><span class="hb-label">Function-to-Snippet</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:2"></span></span><span class="hb-val">2</span></div>
+              <div class="hb-row" role="listitem" data-tip="Project-to-function|1 article" aria-label="Project to function: 1 article"><span class="hb-label">Project-to-Function</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1"></span></span><span class="hb-val">1</span></div>
+              <div class="hb-row" role="listitem" data-tip="Project-to-snippet|1 article" aria-label="Project to snippet: 1 article"><span class="hb-label">Project-to-Snippet</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1"></span></span><span class="hb-val">1</span></div>
+              <div class="hb-row" role="listitem" data-tip="File-to-line|1 article" aria-label="File to line: 1 article"><span class="hb-label">File-to-Line</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1"></span></span><span class="hb-val">1</span></div>
+            </div>
+            <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">15</span><span style="left:50%">30</span><span style="left:75%">45</span><span style="left:100%">60</span></div><span class="sp"></span></div>
+            <div class="chart-foot">
+              <span>Articles, Table 2. Project includes executables.</span>
+              <details class="chart-table"><summary>Show as table</summary>
+                <div class="table-wrap"><table class="data-table">
+                  <thead><tr><th>Input</th><th>Output</th><th class="n">Articles</th></tr></thead>
+                  <tbody>
+                    <tr><td>Project / executable</td><td>Project / executable</td><td class="n">2</td></tr>
+                    <tr><td>Project / executable</td><td>Function</td><td class="n">1</td></tr>
+                    <tr><td>Project / executable</td><td>Slice</td><td class="n">6</td></tr>
+                    <tr><td>Project / executable</td><td>Snippet</td><td class="n">1</td></tr>
+                    <tr><td>Project / executable</td><td>Line</td><td class="n">2</td></tr>
+                    <tr><td>Commit</td><td>Commit</td><td class="n">3</td></tr>
+                    <tr><td>File</td><td>Line</td><td class="n">1</td></tr>
+                    <tr class="hl"><td>Function</td><td>Function</td><td class="n">55</td></tr>
+                    <tr><td>Function</td><td>Line</td><td class="n">4</td></tr>
+                    <tr><td>Function</td><td>Slice</td><td class="n">3</td></tr>
+                    <tr><td>Function</td><td>Snippet</td><td class="n">2</td></tr>
+                    <tr><td>Slice</td><td>Slice</td><td class="n">6</td></tr>
+                    <tr><td>Snippet</td><td>Snippet</td><td class="n">5</td></tr>
+                  </tbody>
+                </table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="ex-panel" id="cx-lang" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Programming Languages</h4>
+          <p>The literature is dominated by works looking at a single language (92%), of which C/C++ is the overwhelmingly most common target (85% of single-language articles). Additionally, all articles that consider multiple languages include C/C++ as one of them. Non-C/C++ single-language articles appear only sporadically, with Java representing the most consistent alternative.</p>
+          <div class="chart">
+            <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>C/C++ only</span><span><i class="sw-n"></i>Other</span></div>
+            <div class="hb" role="list" style="--max:80; --label-w:9rem">
+              <div class="hb-group">Single language</div>
+              <div class="hb-row" role="listitem" data-tip="C/C++|70 articles" aria-label="C/C++: 70 articles"><span class="hb-label">C/C++</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:70"></span></span><span class="hb-val hi">70</span></div>
+              <div class="hb-row" role="listitem" data-tip="Java|5 articles" aria-label="Java: 5 articles"><span class="hb-label">Java</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:5"></span></span><span class="hb-val">5</span></div>
+              <div class="hb-row" role="listitem" data-tip="Assembly / binary|4 articles" aria-label="Assembly or binary: 4 articles"><span class="hb-label">Assembly / binary</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:4"></span></span><span class="hb-val">4</span></div>
+              <div class="hb-row" role="listitem" data-tip="JavaScript|1 article" aria-label="JavaScript: 1 article"><span class="hb-label">JavaScript</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1"></span></span><span class="hb-val">1</span></div>
+              <div class="hb-row" role="listitem" data-tip="PHP|1 article" aria-label="PHP: 1 article"><span class="hb-label">PHP</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1"></span></span><span class="hb-val">1</span></div>
+              <div class="hb-row" role="listitem" data-tip="Python|1 article" aria-label="Python: 1 article"><span class="hb-label">Python</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:1"></span></span><span class="hb-val">1</span></div>
+              <div class="hb-group">Multi-language</div>
+              <div class="hb-row" role="listitem" data-tip="Multi-language|5 articles, all including C/C++|C/C++ and Java: 2|C/C++ and Python: 1|C/C++, Java, Swift, PHP: 1|Seven languages incl. C/C++: 1" aria-label="Multi-language: 5 articles, all including C/C++"><span class="hb-label">Multi-language</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:5"></span></span><span class="hb-val">5</span></div>
+            </div>
+            <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">20</span><span style="left:50%">40</span><span style="left:75%">60</span><span style="left:100%">80</span></div><span class="sp"></span></div>
+            <div class="chart-foot">
+              <span>Articles, Table 3.</span>
+              <details class="chart-table"><summary>Show as table</summary>
+                <div class="table-wrap"><table class="data-table">
+                  <thead><tr><th>Language(s)</th><th class="n">Articles</th></tr></thead>
+                  <tbody>
+                    <tr class="hl"><td>C/C++</td><td class="n">70</td></tr>
+                    <tr><td>Java</td><td class="n">5</td></tr>
+                    <tr><td>Assembly / binary</td><td class="n">4</td></tr>
+                    <tr><td>JavaScript</td><td class="n">1</td></tr>
+                    <tr><td>PHP</td><td class="n">1</td></tr>
+                    <tr><td>Python</td><td class="n">1</td></tr>
+                    <tr><td>C/C++, Java</td><td class="n">2</td></tr>
+                    <tr><td>C/C++, Python</td><td class="n">1</td></tr>
+                    <tr><td>C/C++, Java, Swift, PHP</td><td class="n">1</td></tr>
+                    <tr><td>C/C++, JavaScript, Ruby, Go, Java, C#, Python</td><td class="n">1</td></tr>
+                  </tbody>
+                </table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="ex-panel" id="cx-data" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Datasets</h4>
+          <p>All of the most common datasets target C/C++ code, and all are at either the function or slice level of granularity. Big-Vul is the only dataset in the top nine to provide labels at more than one granularity, including both function-level and line-level annotations. Furthermore, two of the most widely used datasets (Devign/CodeXGLUE and ReVeal) do not provide CWE-IDs, which may directly contribute to the predominance of binary classification in the literature.</p>
+          <div class="chart">
+            <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>Three most used</span><span><i class="sw-n"></i>Other common benchmarks</span></div>
+            <div class="hb" role="list" style="--max:40; --label-w:9.5rem">
+              <div class="hb-row" role="listitem" data-tip="Devign / CodeXGLUE|27 articles|Function level, no CWE type" aria-label="Devign or CodeXGLUE: 27 articles"><span class="hb-label">Devign / CodeXGLUE</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:27"></span></span><span class="hb-val hi">27</span></div>
+              <div class="hb-row" role="listitem" data-tip="ReVeal|17 articles|Function level, no CWE type" aria-label="ReVeal: 17 articles"><span class="hb-label">ReVeal</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:17"></span></span><span class="hb-val">17</span></div>
+              <div class="hb-row" role="listitem" data-tip="Big-Vul|17 articles|Function and line level" aria-label="Big-Vul: 17 articles"><span class="hb-label">Big-Vul</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:17"></span></span><span class="hb-val">17</span></div>
+              <div class="hb-row" role="listitem" data-tip="VulDeePecker|9 articles|Slice level" aria-label="VulDeePecker: 9 articles"><span class="hb-label">VulDeePecker</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:9"></span></span><span class="hb-val">9</span></div>
+              <div class="hb-row" role="listitem" data-tip="SySeVR|6 articles|Slice level" aria-label="SySeVR: 6 articles"><span class="hb-label">SySeVR</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:6"></span></span><span class="hb-val">6</span></div>
+              <div class="hb-row" role="listitem" data-tip="Draper|5 articles|Function level" aria-label="Draper: 5 articles"><span class="hb-label">Draper</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:5"></span></span><span class="hb-val">5</span></div>
+              <div class="hb-row" role="listitem" data-tip="D2A|5 articles|Slice level" aria-label="D2A: 5 articles"><span class="hb-label">D2A</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:5"></span></span><span class="hb-val">5</span></div>
+              <div class="hb-row" role="listitem" data-tip="µVulDeePecker|4 articles|Slice level" aria-label="µVulDeePecker: 4 articles"><span class="hb-label">µVulDeePecker</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:4"></span></span><span class="hb-val">4</span></div>
+            </div>
+            <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">10</span><span style="left:50%">20</span><span style="left:75%">30</span><span style="left:100%">40</span></div><span class="sp"></span></div>
+            <div class="chart-foot">
+              <span>Articles using each benchmark, Table 4.</span>
+              <details class="chart-table"><summary>Show as table</summary>
+                <div class="table-wrap"><table class="data-table">
+                  <thead><tr><th>Dataset</th><th class="n">Articles</th></tr></thead>
+                  <tbody>
+                    <tr class="hl"><td>Devign / CodeXGLUE</td><td class="n">27</td></tr>
+                    <tr><td>ReVeal</td><td class="n">17</td></tr>
+                    <tr><td>Big-Vul</td><td class="n">17</td></tr>
+                    <tr><td>VulDeePecker</td><td class="n">9</td></tr>
+                    <tr><td>SySeVR</td><td class="n">6</td></tr>
+                    <tr><td>Draper</td><td class="n">5</td></tr>
+                    <tr><td>D2A</td><td class="n">5</td></tr>
+                    <tr><td>µVulDeePecker</td><td class="n">4</td></tr>
+                  </tbody>
+                </table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="ex-panel" id="cx-model" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>ML Approaches</h4>
+          <p>RNNs were the dominant approach from 2017 to 2020, reflecting their established capability for modeling sequential data. GNNs superseded RNNs as the dominant approach from 2021 to 2023 and represent 37.9% of all included articles. Finally, LLMs account for 23.0% of articles overall but represent 46.2% of the approaches in 2024 and 2025 articles, demonstrating a sharp and recent shift in the field. LLM-based solutions are applied either through prompting (12 articles) or fine-tuning (8 articles), with one article combining pre-training and fine-tuning.</p>
+          <div class="chart">
+            <div class="hb" role="list" style="--max:40; --label-w:8rem">
+              <div class="hb-row" role="listitem" data-tip="Graph neural networks|33 articles (37.9%)|GCN 10, GGNN 7, GAT 5, RGCN 4, other 11" aria-label="GNN: 33 articles"><span class="hb-label">GNN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:33"></span></span><span class="hb-val hi">33</span></div>
+              <div class="hb-row" role="listitem" data-tip="Large language models|20 articles (23.0%)|Prompting 12, fine-tuning 8|Pre-training and fine-tuning 1" aria-label="LLM: 20 articles"><span class="hb-label">LLM</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:20"></span></span><span class="hb-val">20</span></div>
+              <div class="hb-row" role="listitem" data-tip="Recurrent neural networks|18 articles|BLSTM 9, LSTM 7, BGRU 2" aria-label="RNN: 18 articles"><span class="hb-label">RNN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:18"></span></span><span class="hb-val">18</span></div>
+              <div class="hb-row" role="listitem" data-tip="Convolutional neural networks|11 articles" aria-label="CNN: 11 articles"><span class="hb-label">CNN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:11"></span></span><span class="hb-val">11</span></div>
+              <div class="hb-row" role="listitem" data-tip="Other approaches|8 articles" aria-label="Other: 8 articles"><span class="hb-label">Other</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:8"></span></span><span class="hb-val">8</span></div>
+            </div>
+            <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">10</span><span style="left:50%">20</span><span style="left:75%">30</span><span style="left:100%">40</span></div><span class="sp"></span></div>
+            <div class="chart-foot">
+              <span>Articles, Table 5. An article can count in more than one approach.</span>
+              <details class="chart-table"><summary>Show as table</summary>
+                <div class="table-wrap"><table class="data-table">
+                  <thead><tr><th>Approach</th><th>Sub-approach</th><th class="n">Articles</th></tr></thead>
+                  <tbody>
+                    <tr class="hl"><td>GNN</td><td>GCN 10, GGNN 7, GAT 5, RGCN 4, other 11</td><td class="n">33</td></tr>
+                    <tr><td>LLM</td><td>Prompting 12, fine-tuning 8, pre-training and fine-tuning 1</td><td class="n">20</td></tr>
+                    <tr><td>RNN</td><td>BLSTM 9, LSTM 7, BGRU 2</td><td class="n">18</td></tr>
+                    <tr><td>CNN</td><td>–</td><td class="n">11</td></tr>
+                    <tr><td>Other</td><td>–</td><td class="n">8</td></tr>
+                  </tbody>
+                </table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="ex-panel" id="cx-metric" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Evaluation Metrics</h4>
+          <p>The overwhelming majority of the works use the typical metrics for classification: Accuracy, Precision, Recall, False Positive Rate (FPR), and False Negative Rate (FNR). To capture the interaction between Precision and Recall, the F1-score is also frequently reported and is the single most common metric, being used in 68 of the 87 articles; much less frequently, the Precision-Recall Area Under Curve (PR-AUC) is used in two included articles. The Receiver Operating Characteristic Area Under Curve (ROC-AUC) is reported in seven works to show the trade-off between Recall and FPR.</p>
+          <div class="chart">
+            <div class="hb" role="list" style="--max:80; --label-w:8rem">
+              <div class="hb-row" role="listitem" data-tip="F1-score|68 of 87 articles" aria-label="F1-score: 68 articles"><span class="hb-label">F1-score</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:68"></span></span><span class="hb-val hi">68</span></div>
+              <div class="hb-row" role="listitem" data-tip="ROC-AUC|7 articles" aria-label="ROC-AUC: 7 articles"><span class="hb-label">ROC-AUC</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:7"></span></span><span class="hb-val">7</span></div>
+              <div class="hb-row" role="listitem" data-tip="PR-AUC|2 articles" aria-label="PR-AUC: 2 articles"><span class="hb-label">PR-AUC</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:2"></span></span><span class="hb-val">2</span></div>
+            </div>
+            <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">20</span><span style="left:50%">40</span><span style="left:75%">60</span><span style="left:100%">80</span></div><span class="sp"></span></div>
+            <div class="chart-foot">
+              <span>Articles. Exact counts are given for these three metrics.</span>
+              <details class="chart-table"><summary>Show as table</summary>
+                <div class="table-wrap"><table class="data-table">
+                  <thead><tr><th>Metric</th><th class="n">Articles</th></tr></thead>
+                  <tbody><tr class="hl"><td>F1-score</td><td class="n">68</td></tr><tr><td>ROC-AUC</td><td class="n">7</td></tr><tr><td>PR-AUC</td><td class="n">2</td></tr></tbody>
+                </table></div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="psec" id="pain-points">
+    <h2>Pain Points and Recommendations</h2>
+    <div class="prose">
+      <p>Building on the quantitative findings and a selection of empirical studies identified in the literature search, we qualitatively examine the motivations behind these limitations as articulated in the included papers and trace how they propagate through the field. While many of these issues have been raised individually in prior work, no existing source provides an integrated view.</p>
+    </div>
+
+    <div class="explorer">
+      <div class="ex-tabs" aria-label="Pain points">
+        <div class="ex-group">Research question</div>
+        <button class="ex-tab" aria-controls="pp1" aria-selected="true"><span class="hb-code">PP1</span>Binary formulation</button>
+        <button class="ex-tab" aria-controls="pp2"><span class="hb-code">PP2</span>Granularity</button>
+        <button class="ex-tab" aria-controls="pp3"><span class="hb-code">PP3</span>Dataset-led formulation</button>
+        <div class="ex-group">Programming language</div>
+        <button class="ex-tab" aria-controls="pp4"><span class="hb-code">PP4</span>Language mismatch</button>
+        <div class="ex-group">Datasets</div>
+        <button class="ex-tab" aria-controls="pp5"><span class="hb-code">PP5</span>Unrepresentative data</button>
+        <button class="ex-tab" aria-controls="pp6"><span class="hb-code">PP6</span>Dataset quality</button>
+        <button class="ex-tab" aria-controls="pp7"><span class="hb-code">PP7</span>Missing information</button>
+        <button class="ex-tab" aria-controls="pp8"><span class="hb-code">PP8</span>Test-set leakage</button>
+        <div class="ex-group">Training</div>
+        <button class="ex-tab" aria-controls="pp9"><span class="hb-code">PP9</span>Overfitting</button>
+        <div class="ex-group">Evaluation</div>
+        <button class="ex-tab" aria-controls="pp10"><span class="hb-code">PP10</span>Comparability</button>
+        <button class="ex-tab" aria-controls="pp11"><span class="hb-code">PP11</span>Metrics</button>
+        <button class="ex-tab" aria-controls="pp12"><span class="hb-code">PP12</span>Explainability</button>
+      </div>
+      <div>
+        <div class="ex-panel" id="pp1" data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 1: Problem formulation focuses on binary classification</h4>
+          <p>AVD is conceptualized as a standalone classification task, with a large focus on binary labels; this limits the value of the research in the wider context of the vulnerability life cycle.</p>
+          <dl>
+            <dt>Description</dt><dd>On the rare occasion this choice is motivated, it is justified with reference to classification being the prevailing formulation in the field. In this context, binary classification of code into vulnerable or benign classes is considered the de facto default. In contrast, articles that adopt a multi-class formulation motivate it as an improvement over binary classification, as each vulnerability type will have different features.</dd>
+            <dt>Implications</dt><dd>Although binary formulations are simpler to solve, simply classifying a unit of code as vulnerable does not provide the information required by subsequent steps. Providing the vulnerability type (CWE-ID) supports triage, replication, and repair, whether performed automatically or by a human expert. For this reason, most vulnerability detection tools currently used in industry provide the vulnerability type. Nevertheless, 10 of the 16 articles using CWE-based formulations were published in 2023 or later, suggesting an emerging interest in this more practical formulation.</dd>
+            <dt>Recommendations</dt><dd>The problem formulation of ML4AVD should take into account the vulnerability life cycle and the role detection plays in it. At a minimum, multi-label classification based on the CWE-ID (or similar) provides information on severity required for triage, which also allows algorithms to learn features specific to each type of vulnerability. Additional information for each vulnerability, such as conditions and code paths that can trigger it, would be valuable for triaging the severity of the vulnerability and replicating it. Furthermore, program analysis techniques such as symbolic execution, concolic testing, and guided fuzzing are complementary to ML4AVD.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp2" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 2: Granularity does not differentiate between input and output</h4>
+          <p>ML4AVD overwhelmingly uses the same granularity for both input and output, with function-to-function approaches being the majority of the field as a compromise between context and precision.</p>
+          <dl>
+            <dt>Description</dt><dd>This appears to be the ‘default’ in the literature and indicates that input and output granularities are conflated. Function-level granularities are argued to offer a useful level of detail while still retaining enough context, though this is obviously not always the case, as vulnerabilities that span multiple functions are sometimes discarded, and line-level detection is left as future work. Therefore, it is not surprising that coarser granularities, e.g., commit and slice, are motivated by the need for additional context for classification. In contrast, line-level output granularities are motivated as being more precise and usable.</dd>
+            <dt>Implications</dt><dd>A same-to-same relationship introduces an artificial trade-off: an increase in granularity that captures more contextual information would produce less specific output and vice versa. Real-world vulnerabilities frequently occur at inter-procedural boundaries where function-level solutions struggle, and a manual expert review of function-level datasets found that vulnerabilities are overwhelmingly context-dependent, most commonly on argument values or the behavior of other functions that are not included in the sample. Function-level granularity also lacks the precision to target subsequent repair, as functions may be arbitrarily complex and thus require significant additional effort to patch the vulnerable code.</dd>
+            <dt>Recommendations</dt><dd>Future work should separate input and output granularities. For inputs, solutions should include all required context, therefore, targeting project-level input granularity, which is known to produce better results compared to function-level. For outputs, solutions should aim for fine granularity to best inform subsequent steps in the vulnerability life cycle, pointing to one or more specific lines of code and the code paths and conditions required to trigger the vulnerability. Note that solving at a low granularity implicitly solves all higher granularities, as a function containing a vulnerable line is itself vulnerable, and so on, with the additional benefit of better contextualizing any findings. Future work should look to use multi-granularity datasets, such as ReposVul or VulEval.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp3" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 3: Problem formulation is influenced by available dataset</h4>
+          <p>The availability of function-level datasets and the focus of influential papers on binary classification have implicitly pushed the field into the most common formulation: function-to-function binary classification.</p>
+          <dl>
+            <dt>Description</dt><dd>The early focus on function-to-function classification has produced many prominent function-level datasets. The choice of dataset in the analyzed literature is sometimes motivated by existing high usage in the field. Creating high-quality datasets requires large time-investments (e.g., “600 hours” or “150 hours”); thus, using available datasets is a significant time-saving choice. Lack of available datasets is cited as a reason for coarse-grained detection and limited line-level baseline comparisons.</dd>
+            <dt>Implications</dt><dd>Popular datasets shape the direction of the field by making certain problem formulations more tractable to study, while prior work reinforces those formulations by motivating their use and providing established points of comparison. In turn, this further propagates the datasets, leading to a feedback loop that reinforces existing paradigms.</dd>
+            <dt>Recommendations</dt><dd>Datasets should attempt to be formulation-agnostic. Datasets need to contain full context, preferably (a way to reconstruct) repositories with version control history, and provide rich multi-class labeled data from project-level down to line-level. For work that consumes existing datasets, we recommend authors critically evaluate datasets and the influence their limitations might have on the work. Additionally, information about the CWE, explanations of the vulnerability, and conditions under which it is triggered may be useful in extending the task beyond pure classification.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp4" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 4: Programming languages are not proportional to use or susceptibility</h4>
+          <p>C/C++ is overrepresented compared to real-world usage or the prevalence of vulnerabilities, in part, influenced by pre-processing tools.</p>
+          <dl>
+            <dt>Description</dt><dd>As with previous pain points, this appears to be the ‘default’ in ML4AVD research, rarely being explicitly motivated. The availability of C/C++ datasets is one explanation, as is the focus on memory-related vulnerabilities. Due to the explicit memory management model, C and C++ are notorious for memory-based vulnerabilities, which make up 40% of the MITRE 2023 Top-25 dangerous software weaknesses. Additionally, for GNN-based solutions, the languages supported by the tools used to generate the graph-based IRs (e.g., Joern) are cited as a factor in the choice of language.</dd>
+            <dt>Implications</dt><dd>For each language, we compute a combined danger score by adding the danger scores of its vulnerabilities, then normalizing it by the sum of all the Top-25 vulnerabilities. From this, PHP is the most vulnerable language, followed by C/C++, Java, and JavaScript. Yet, PHP currently makes up less than 10% of AVD research, disproportionate to its relative vulnerability. Although the literature frequently claims that ML4AVD solutions proposed for C/C++ would simply transfer to other languages, this claim is not sufficiently backed by evidence.</dd>
+            <dt>Recommendations</dt><dd>To better reflect the diversity of real-world languages and vulnerabilities, future research should diversify its focus to include languages such as Python and JavaScript, due to their significant popularity, along with Java and PHP due to their susceptibility to vulnerabilities. Furthermore, we suggest that future work should propose ML4AVD solutions targeting more complex multi-lingual software projects, as a recent survey of professional developers found that a typical software project has an average of 7 different programming languages. Tooling no longer imposes as significant a limitation on which languages can be supported.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp5" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 5: Widely used datasets are unrepresentative</h4>
+          <p>Datasets do not represent a realistic distribution of labels, projects, and vulnerabilities, and some widely used datasets include synthetic samples.</p>
+          <dl>
+            <dt>Description</dt><dd>The most widely used dataset in the analyzed papers is Devign (or the CodeXGLUE derivative), which has an unrealistic balanced proportion of vulnerable and benign labels. Both the Devign and ReVeal datasets include samples from only two software projects each, which limits the diversity of code present in the dataset and the types of vulnerabilities. The VulDeePecker dataset only includes two vulnerability types, which motivates the introduction of the similar SySeVR dataset containing 126 vulnerabilities, though this is only a fraction still of the over 900 types listed on CWE. Some widely used datasets also include significant proportions of synthetic samples from SARD alongside samples collected from real-world data.</dd>
+            <dt>Implications</dt><dd>Real-world vulnerability distributions are heavily skewed, with the largest proportion of files being benign. Training deep learning methods on datasets that over-represent vulnerabilities may bias models, and training only on datasets containing vulnerable-patched sample pairs excludes features present in files that are not security-relevant. Both of these biases may produce more false positives. Conversely, the proportion of vulnerable samples in a truly realistic dataset may be too low to efficiently train models, biasing models towards benign predictions. Synthetic samples do not provide a realistic depiction of the complexity of real-world vulnerabilities and, thus, may not provide a useful signal for training ML4AVD models. Low variety in vulnerability types and source projects reduces models’ usefulness and generalizability to unseen code.</dd>
+            <dt>Recommendations</dt><dd>To handle imbalanced data for training, we recommend conservatively under-sampling benign samples rather than over-sampling vulnerable samples to avoid introducing unrealistic synthetic samples. When under-sampling, the corresponding patched sample for each vulnerable sample should be retained within the training set to provide fine-grained contrastive signals. Furthermore, the training distribution can also be tuned empirically: in the adjacent imbalanced classification domain of malware classification, <a href="/papers/tesseract/">tuning algorithms have been proposed</a> to find the training class ratio that maximizes a target performance metric on a held-out validation set. Validation and testing sets must be kept heavily imbalanced to ensure accurate calibration and evaluation on realistic data.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp6" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 6: Widely used datasets suffer from quality issues</h4>
+          <p>Commonly used datasets include high proportions of mislabeled samples and duplicate data.</p>
+          <dl>
+            <dt>Description</dt><dd>In a manual review, Croft, Babar, and Kholoosi found that a subset of the Big-Vul dataset contained 45% mislabeled samples; Devign contained 20%, and D2A contained 71% mislabeled samples. This is partially attributed to the collection techniques used, which take security-related commits and label functions that have been changed as vulnerable pre-commit, even if the change is unrelated or not directly security-related. Additionally, datasets contained significant duplicate samples and had inconsistent labels for some duplicate entries.</dd>
+            <dt>Implications</dt><dd>Low-quality data produces less capable ML4AVD models which are affected by biases in the data, learning spurious features. Poor-quality datasets also make evaluating models’ true capabilities difficult, as incorrect labels in the evaluation set will impact the reported metrics. When duplicate samples occur between training and test data, it undermines the validity of the evaluation. When removing duplicates, model performance decreases compared to reported results.</dd>
+            <dt>Recommendations</dt><dd>If using these datasets, pre-processing steps may help remove some duplicate and mislabeled data, though any pre-processing should be clearly described, and any refined datasets created as part of the work should be made available in the service of fairly comparing work. Pre-processing steps, such as slicing, may also introduce duplication, so de-duplication may be required in such cases even when the underlying dataset has unique samples. We recommend critically assessing datasets and using those that resolve the limitations we identify; existing widely used datasets with known quality issues should be used only for evaluation to facilitate comparison with previous solutions.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp7" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 7: Datasets lack important information</h4>
+          <p>Widely used datasets do not contain CWE type, do not explicitly pair related vulnerable and fixed samples, and do not provide meta-information about the vulnerability (CVE, bug reports, discussions).</p>
+          <dl>
+            <dt>Description</dt><dd>The widely used Devign dataset and its derivatives do not include information about the vulnerability type. Only Big-Vul includes information about the vulnerability in the form of a CVE ID. No dataset includes other meta-information surrounding the vulnerability, such as bug tracker issues, mailing lists, or merge request discussions for the patch.</dd>
+            <dt>Implications</dt><dd>The lack of CWE ID contributes to the focus on binary formulations. Lacking explicit links between vulnerable/patched sample pairs prevents leveraging pairs during training to increase separation between classes, which leads to spurious correlations. As LLM-based solutions are being increasingly used, which can make use of additional non-code information, the lack of meta-data and vulnerability-related discussion in the datasets impedes this avenue of development.</dd>
+            <dt>Recommendations</dt><dd>Datasets should at least include all information that a human expert may use to identify a vulnerability, which allows novel methods to integrate code and non-code data (commit messages, bug tracker issues, mailing lists, or pull/merge request discussions). As most datasets include at least repository and commit information, it is possible for future work that uses datasets without explicit pairs to reconstruct the link between vulnerable and patched samples, then use them for training and evaluation. The VulZoo dataset, which enriches vulnerabilities with additional information, including mailing list discussions, can be used to source non-code data, which may especially benefit LLM fine-tuning.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp8" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 8: Datasets leak test data</h4>
+          <p>Many of the widely used datasets lack explicit train/test splits, and where they are present, assignment is random, ignoring temporal relations between code samples in the same project; duplicate samples and data snooping by pre-trained large language models aggravate these issues.</p>
+          <dl>
+            <dt>Description</dt><dd>The majority of datasets used in the included articles do not provide fixed training/validation/test subset splits. Where a fixed split is present in datasets used by the analyzed work, assignment is randomized; when using datasets without a fixed split, analyzed articles most commonly use random assignment, which is motivated by mirroring previous work and enabling better baseline comparisons and rarely use date-based splits. Additionally, synthetic samples from SARD, sampled by some datasets, include the label (“bad”) in the variable names, which requires pre-processing to remove.</dd>
+            <dt>Implications</dt><dd>Randomly splitting datasets into test and training sets is likely to leak test set information to the ML4AVD models, allowing models to ‘time travel’, which inflates reported results. When a time-based split is used instead of a random split, model performance is shown to decrease. Outside of ML4AVD, temporally consistent splits have become common practice in the adjacent domain of malware detection and, more widely across ML for cybersecurity, <a href="/papers/sok/">the necessity to capture the non-stationarity inherent in cybersecurity tasks has been raised</a>. Agentic LLM-based solutions, which have been shown to exhibit reward hacking, may access openly available test data.</dd>
+            <dt>Recommendations</dt><dd>Future work should use datasets derived from real-world data with fixed train/test splits, especially recent datasets that explicitly account for temporal correlation between samples and split the test data chronologically. To minimize data leakage and memorization issues, especially with LLM-based solutions, we recommend future datasets retain a hidden test set for use with a public leaderboard.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp9" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 9: Solutions suffer from overfitting and poor generalization</h4>
+          <p>Poor training practices lead to models learning spurious correlations and, subsequently, poor generalization to unseen source code.</p>
+          <dl>
+            <dt>Description</dt><dd>Some of the analyzed works attempt to reduce the possibility of overfitting through generic deep learning methods, such as reducing the number of parameters, using dropout, early termination/low number of epochs, and other techniques. Only a minority of the included papers used ablation studies to analyze how different aspects of their ML4AVD solutions affect their results and validate that each component contributes to any claimed improvements over the state-of-the-art. Evaluating baselines on different datasets/projects than those used for training produces worse results, which is indicative of overfitting to training data. In general, test set leakage constitutes a significant cause of overfitting, including for LLM-based solutions, which appear to exhibit better performance on data before the training cutoff date.</dd>
+            <dt>Implications</dt><dd>Overfitting produces artificially inflated results that do not hold up in a real-world setting, as it produces models that are unable to generalize to unseen data. Data augmentation through semantics-preserving code mutations is used to demonstrate that existing techniques overfit to specific syntax and text tokens, rather than semantic features, with a large emphasis on memory allocation code. Evaluation on paired vulnerable/patched samples shows that ML4AVD solutions, including LLM-based solutions, are unable to consistently distinguish them correctly.</dd>
+            <dt>Recommendations</dt><dd>As a fundamental step, we recommend using representative, high-quality datasets that contain multiple granularities and context for each sample. Additionally, contrasting paired vulnerable and patched samples, which is supported by datasets that make such pairs explicit, may help models learn the specific differences between them, reducing spurious correlations. Evaluating on different projects, datasets, or with different data augmentations than the training set can provide better insights into how well the model generalizes to unseen code. Ablation studies can validate the chosen architecture and that no extraneous complexity exists in the system.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp10" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 10: Evaluation makes it difficult to measure progress and applicability</h4>
+          <p>Comparability across works is problematic, due to evaluation methodology, limitations of datasets, and difficulty in reproducing baseline results; evaluation does not give a sense of realistic performance.</p>
+          <dl>
+            <dt>Description</dt><dd>The poor reproducibility of results is noted early in the period we analyzed, with Chakraborty et al. not being able to reproduce the results of Zhou et al. Zhou et al. did not make their implementation public, which required it to be re-implemented, and the public Devign dataset contains code sourced from two open source projects (FFmpeg, Qemu), while the model was trained using a broader dataset containing samples from four projects (additionally, Linux and Wireshark). It is common (38/87) for code and other artifacts (e.g., model weights/checkpoints) not to be made available in the analyzed work. Finally, any use of closed-weight models through an API produces reproducibility issues, as models may change, even without public announcements.</dd>
+            <dt>Implications</dt><dd>Without effective evaluations, progress in the field of ML4AVD is difficult to measure. Evaluations do not convey how well the ML4AVD solutions can be applied in real-world settings. Additionally, poor evaluation hides the problems of overfitting and poor generalization to unseen data, and further undermines the practical utility of the solutions.</dd>
+            <dt>Recommendations</dt><dd>Future work should open-source all code, including any pre-processing steps, and model weights and checkpoints to aid reproducibility and future baselines. Furthermore, it should fully describe hyper-parameters, including setting and publishing random seed values. When using LLM-based methods, prompts should be considered a constituent part of the parametrization of the model. As datasets have been known to become unavailable when hosted independently, we strongly recommend using dedicated hosting platforms that support versioning for all open-sourced artifacts. Evaluation should occur on representative imbalanced real-world datasets with realistic time-based train/test splits. For new agentic LLM-based solutions, evaluation should ensure that results are valid, and agents are not reward-hacking or extracting correct answers from available data.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp11" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 11: Metrics do not capture realistic performance</h4>
+          <p>The majority of ML4AVD works use only classification metrics, without accounting for class imbalance or detecting overfitting.</p>
+          <dl>
+            <dt>Description</dt><dd>Frequently, the motivation for the choice of metrics, particularly F1-score, Accuracy, Precision, Recall, and ROC-AUC, is the task being (binary) classification; however, more commonly the choice of metrics is motivated as being ‘standard’, ‘popular’, or ‘widely used’ or with reference to specific prior work. Unbiased metrics are also used to handle imbalanced data, with MCC being used more than Informedness and Markedness. Paired accuracy, the number of paired vulnerable/patched samples that are both classified correctly, is used in one work to detect spurious correlations.</dd>
+            <dt>Implications</dt><dd>To understand how models may perform in real-world settings, evaluating on realistic, imbalanced test sets is paramount, and this requires metrics that can capture performance in imbalanced datasets. If not accounted for, this leads to the base rate fallacy, which causes accuracy to overestimate performance. Due to the label imbalance, even apparently low FPR can be misleading, as it may still lead to high absolute numbers of false alerts, which cause alert fatigue. Thus, the F1-score, which equally weighs Precision and Recall, does not capture the trade-off well, as it provides information at a specific threshold.</dd>
+            <dt>Recommendations</dt><dd>We recommend that future work evaluates on heavily imbalanced realistic test sets to establish real-world performance and report the PR-AUC curve to make the trade-off between Precision and Recall explicit in a threshold-independent manner. As even low FPR can incur substantial practical costs, we argue that Recall at a given FPR (denoted as Recall@FPR) provides a more actionable measure of effectiveness. When evaluating how well an ML4AVD solution can differentiate the vulnerable and patched samples in a pair, future work should report the proportion of pairs for which both samples were classified correctly. Although publishing new CVEs has been used as a metric for real-world applicability, it incentivizes spurious vulnerability reporting.</dd>
+          </dl>
+        </div>
+        <div class="ex-panel" id="pp12" hidden data-augmented-ui="tl-clip br-clip border">
+          <h4>Pain Point 12: Solutions exhibit poor explainability and interpretability</h4>
+          <p>Explainability and interpretability are not a consideration for many of the included articles, providing only a label without providing a motivation for why the model arrived at the classification.</p>
+          <dl>
+            <dt>Description</dt><dd>Although literature on interpretability and explainability has tried to separate the terminology – explainability meaning a post-hoc process, while interpretability is inherent to the process – the analyzed literature uses these terms interchangeably, even within the same article. Li, Wang, and Nguyen use subgraph-based explainability to provide finer output granularity. Similarly, attention-based explainability is also used to produce finer-grained output. Articles that performed user studies evaluated the explainability of the models, which indicates that it is an important consideration for real-world applicability.</dd>
+            <dt>Implications</dt><dd>Explainability and interpretability provide information linking vulnerability classification with potential causes. This can feed into further steps of the vulnerability life cycle, helping practitioners and improving real-world applicability. As language models have become more prevalent in the ML4AVD space, they have been seen as a potential solution for explainability, but self-explanation may not be faithful to those processes, producing plausible but misleading explanations. This has been observed in LLM-based ML4AVD applications as well, with correct categorization paired with incorrect explanations and vice versa.</dd>
+            <dt>Recommendations</dt><dd>A key component of explainability is implicitly resolved by following the recommendations in Pain Point 1 and Pain Point 2, as more precise and contextually informed outputs from ML4AVD systems enhance the explainability of classification results. Generic black-box explainability tools may provide some benefit. For GNN-based solutions, specific explainability solutions have been developed. Research using LLM-based methods should go beyond self-explanation, look at the ever-evolving field of LLM explainability, and apply mechanistic interpretability techniques, although such techniques are only applicable to open-weight models and not closed-weight models.</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <h3>High proportions of mislabeled samples</h3>
+    <div class="prose">
+      <p>Dataset quality is a well-known problem in the ML4AVD field, and poor-quality ground truth labels are cited as a motivation for choosing synthetic datasets. In a manual review, Croft, Babar, and Kholoosi found that a subset of the Big-Vul dataset contained 45% mislabeled samples; Devign contained 20%, and D2A contained 71% mislabeled samples. Similarly, Risse and Böhme found high proportions of false positive labels in random subsets of DiverseVul (35%), Devign (50%), and Big-Vul (61%).</p>
+    </div>
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption style="margin:0 0 4px">
+        <p class="chart-title">Share of samples found to be wrongly labeled</p>
+        <p class="chart-sub">Manual reviews of popular ML4AVD datasets, Pain Point 6.</p>
+      </figcaption>
+      <div class="hb" role="list" style="--max:100; --label-w:9rem">
+        <div class="hb-group">Croft, Babar and Kholoosi: mislabeled samples</div>
+        <div class="hb-row" role="listitem" data-tip="Big-Vul (subset)|45% mislabeled|Croft, Babar and Kholoosi" aria-label="Big-Vul subset: 45% mislabeled"><span class="hb-label">Big-Vul (subset)</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:45"></span></span><span class="hb-val">45%</span></div>
+        <div class="hb-row" role="listitem" data-tip="Devign|20% mislabeled|Croft, Babar and Kholoosi" aria-label="Devign: 20% mislabeled"><span class="hb-label">Devign</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:20"></span></span><span class="hb-val">20%</span></div>
+        <div class="hb-row" role="listitem" data-tip="D2A|71% mislabeled|Croft, Babar and Kholoosi" aria-label="D2A: 71% mislabeled"><span class="hb-label">D2A</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:71"></span></span><span class="hb-val hi">71%</span></div>
+        <div class="hb-group">Risse and Böhme: false positive labels in random subsets</div>
+        <div class="hb-row" role="listitem" data-tip="DiverseVul|35% false positive labels|Risse and Böhme" aria-label="DiverseVul: 35% false positive labels"><span class="hb-label">DiverseVul</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:35"></span></span><span class="hb-val">35%</span></div>
+        <div class="hb-row" role="listitem" data-tip="Devign|50% false positive labels|Risse and Böhme" aria-label="Devign: 50% false positive labels"><span class="hb-label">Devign</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:50"></span></span><span class="hb-val">50%</span></div>
+        <div class="hb-row" role="listitem" data-tip="Big-Vul|61% false positive labels|Risse and Böhme" aria-label="Big-Vul: 61% false positive labels"><span class="hb-label">Big-Vul</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:61"></span></span><span class="hb-val">61%</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true"><span class="sp"></span><div class="hb-ticks"><span style="left:0">0</span><span style="left:25%">25</span><span style="left:50%">50</span><span style="left:75%">75</span><span style="left:100%">100%</span></div><span class="sp"></span></div>
+      <div class="chart-foot">
+        
+        <details class="chart-table"><summary>Show as table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>Review</th><th>Dataset</th><th class="n">Wrong labels</th></tr></thead>
+            <tbody>
+              <tr><td>Croft, Babar and Kholoosi</td><td>Big-Vul (subset)</td><td class="n">45%</td></tr>
+              <tr><td>Croft, Babar and Kholoosi</td><td>Devign</td><td class="n">20%</td></tr>
+              <tr><td>Croft, Babar and Kholoosi</td><td>D2A</td><td class="n">71%</td></tr>
+              <tr><td>Risse and Böhme</td><td>DiverseVul</td><td class="n">35%</td></tr>
+              <tr><td>Risse and Böhme</td><td>Devign</td><td class="n">50%</td></tr>
+              <tr><td>Risse and Böhme</td><td>Big-Vul</td><td class="n">61%</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <h3>Comparison of vulnerability datasets</h3>
+    <div class="prose">
+      <p>Much of the work that proposes new datasets is done in response to perceived flaws in existing datasets, with some articles explicitly refining previous datasets. The datasets show that, while there have been improvements, none of the identified datasets bring together all the recommendations we put forward.</p>
+    </div>
+    <div class="table-wrap"><table class="data-table ds">
+      <thead><tr><th>Dataset</th><th class="n yr">Year</th><th class="n">% vuln.</th><th>Granularity</th><th class="c">CWE ID</th><th class="c">Fixed split</th><th class="c">Code pairs</th></tr></thead>
+      <tbody>
+        <tr><td>Devign<span class="yr-in">2019</span></td><td class="n yr">2019</td><td class="n">45.0</td><td>function</td><td class="c">No</td><td class="c">No</td><td class="c">No</td></tr>
+        <tr><td>ReVeal<span class="yr-in">2021</span></td><td class="n yr">2021</td><td class="n">9.2</td><td>function</td><td class="c">No</td><td class="c">No</td><td class="c">Yes</td></tr>
+        <tr><td>Big-Vul<span class="yr-in">2020</span></td><td class="n yr">2020</td><td class="n">5.7</td><td>function, line</td><td class="c">Yes</td><td class="c">Random*</td><td class="c">Yes</td></tr>
+        <tr><td>VulDeePecker<span class="yr-in">2018</span></td><td class="n yr">2018</td><td class="n">28.8</td><td>slice</td><td class="c">Yes</td><td class="c">No</td><td class="c">No</td></tr>
+        <tr><td>SySeVR<span class="yr-in">2018</span></td><td class="n yr">2018</td><td class="n">13.4</td><td>slice</td><td class="c">Yes</td><td class="c">No</td><td class="c">No</td></tr>
+        <tr><td>Draper<span class="yr-in">2021</span></td><td class="n yr">2021</td><td class="n">9.5</td><td>function</td><td class="c">Yes</td><td class="c">Random</td><td class="c">No</td></tr>
+        <tr><td>D2A<span class="yr-in">2021</span></td><td class="n yr">2021</td><td class="n">1.4</td><td>slice</td><td class="c">Yes</td><td class="c">Random</td><td class="c">Yes</td></tr>
+        <tr><td>µVulDeePecker<span class="yr-in">2019</span></td><td class="n yr">2019</td><td class="n">23.7</td><td>slice</td><td class="c">Yes</td><td class="c">No</td><td class="c">No</td></tr>
+        <tr><td>Real-Vul<span class="yr-in">2024</span></td><td class="n yr">2024</td><td class="n">0.3</td><td>repository, function, line</td><td class="c">Yes</td><td class="c">Temporal</td><td class="c">No</td></tr>
+        <tr><td>PrimeVul<span class="yr-in">2024</span></td><td class="n yr">2024</td><td class="n">3.1</td><td>function</td><td class="c">Yes</td><td class="c">Temporal</td><td class="c">Yes</td></tr>
+        <tr><td>VulEval<span class="yr-in">2024</span></td><td class="n yr">2024</td><td class="n">3.0</td><td>repository, file, function</td><td class="c">Yes</td><td class="c">Temporal</td><td class="c">No</td></tr>
+      </tbody>
+    </table></div>
+    <p class="footnote">Selected rows of Table 6. Random: random splits; not accounting for temporal relationships. Temporal: split chronologically. *Fu and Tantithamthavorn provide a version with a random fixed test/train split. Code pairs: explicitly providing both vulnerable and patched code for each datapoint. VulDeePecker, SySeVR, Draper and µVulDeePecker contain both real-world and synthetic data; all rows are C/C++.</p>
+  </section>
+
+  <section class="psec" id="trends">
+    <h2>Overall Trends</h2>
+    <div class="prose">
+      <p>Our analysis identifies twelve pain points spanning the ML4AVD pipeline and shows that they are not independent: they reinforce each other through feedback loops between datasets, formulations, baselines, and metrics. This integrated view explains the field’s most visible symptom, namely that ML4AVD research remains highly concentrated on binary classification of C/C++ vulnerabilities at the function level.</p>
+    </div>
+
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x dg-wide">
+      <svg class="dg" viewBox="0 0 600 340" role="img" aria-label="Feedback loop. Popular function-level C/C++ datasets shape a binary function-level formulation, which is copied by follow-up work into baselines, which are reused for comparison and keep the same datasets in use. Datasets also make C/C++ the default language, and baselines fix classification-only metrics, whose F1 scores show no clear upward trend.">
+        <defs>
+          <marker id="ah-loop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-loop-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="box-red" d="M28 16H196V60L184 72H16V28Z"/>
+        <text class="t-b mid" x="106" y="40">Popular datasets</text>
+        <text class="t-sm t-muted mid" x="106" y="58">function-level, C/C++</text>
+
+        <path class="box" d="M416 16H584V60L572 72H404V28Z"/>
+        <text class="t-b mid" x="494" y="40">Formulation</text>
+        <text class="t-sm t-muted mid" x="494" y="58">binary, function-level</text>
+
+        <path class="box" d="M222 150H390V194L378 206H210V162Z"/>
+        <text class="t-b mid" x="300" y="174">Baselines</text>
+        <text class="t-sm t-muted mid" x="300" y="192">highly cited prior work</text>
+
+        <path class="box" d="M28 270H196V314L184 326H16V282Z"/>
+        <text class="t-b mid" x="106" y="294">Language</text>
+        <text class="t-sm t-muted mid" x="106" y="312">C/C++ by default</text>
+
+        <path class="box" d="M222 270H390V314L378 326H210V282Z"/>
+        <text class="t-b mid" x="300" y="294">Metrics</text>
+        <text class="t-sm t-muted mid" x="300" y="312">classification only</text>
+
+        <path class="box-solid" d="M458 270H584V314L572 326H446V282Z"/>
+        <text class="t-b t-on-red mid" x="515" y="294">Self-reported F1</text>
+        <text class="t-sm t-on-red mid" x="515" y="312">no clear upward trend</text>
+
+        <path class="ln-red" d="M196 44 H400" marker-end="url(#ah-loop-red)"/>
+        <text class="t-sm t-red mid" x="300" y="36">shapes the task</text>
+        <path class="ln-red" d="M494 72 V178 H394" marker-end="url(#ah-loop-red)"/>
+        <text class="t-sm t-red end" x="488" y="120">copied by follow-up work</text>
+        <path class="ln-red" d="M210 178 H106 V76" marker-end="url(#ah-loop-red)"/>
+        <text class="t-sm t-red" x="112" y="120">reused to compare</text>
+
+        <path class="ln" d="M40 72 V266" marker-end="url(#ah-loop)"/>
+        <text class="t-sm t-ink2" x="46" y="230">C/C++ data</text>
+        <path class="ln" d="M300 206 V266" marker-end="url(#ah-loop)"/>
+        <text class="t-sm t-ink2 end" x="294" y="240">same metrics, to compare</text>
+        <path class="ln" d="M390 298 H442" marker-end="url(#ah-loop)"/>
+        <text class="t-sm t-ink2 mid" x="418" y="290">F1 scores</text>
+      </svg>
+      </div>
+      <svg class="dg dg-tall" viewBox="0 0 340 370" role="img" aria-label="Feedback loop. Popular function-level C/C++ datasets shape a binary function-level formulation, which is copied by follow-up work into baselines, which are reused for comparison and keep the same datasets in use. Datasets also make C/C++ the default language, and baselines fix classification-only metrics, whose F1 scores show no clear upward trend.">
+        <defs>
+          <marker id="ah-loop-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 1 L10 5 L0 9 z"/></marker>
+          <marker id="ah-loop-red-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah-red" d="M0 1 L10 5 L0 9 z"/></marker>
+        </defs>
+        <path class="box-red" d="M18 8H134V48L122 60H6V20Z"/>
+        <text class="t-b mid" x="70" y="30">Popular datasets</text>
+        <text class="t-sm t-muted mid" x="70" y="47">function-level, C/C++</text>
+        <path class="box" d="M218 8H334V48L322 60H206V20Z"/>
+        <text class="t-b mid" x="270" y="30">Formulation</text>
+        <text class="t-sm t-muted mid" x="270" y="47">binary, function-level</text>
+        <path class="box" d="M218 122H334V162L322 174H206V134Z"/>
+        <text class="t-b mid" x="270" y="144">Baselines</text>
+        <text class="t-sm t-muted mid" x="270" y="161">highly cited prior work</text>
+        <path class="box" d="M218 228H334V268L322 280H206V240Z"/>
+        <text class="t-b mid" x="270" y="250">Metrics</text>
+        <text class="t-sm t-muted mid" x="270" y="267">classification only</text>
+        <path class="box" d="M18 312H134V352L122 364H6V324Z"/>
+        <text class="t-b mid" x="70" y="334">Language</text>
+        <text class="t-sm t-muted mid" x="70" y="351">C/C++ by default</text>
+        <path class="box-solid" d="M218 312H334V352L322 364H206V324Z"/>
+        <text class="t-b t-on-red mid" x="270" y="334">Self-reported F1</text>
+        <text class="t-sm t-on-red mid" x="270" y="351">no clear upward trend</text>
+        <path class="ln-red" d="M134 36 H202" marker-end="url(#ah-loop-red-t)"/>
+        <text class="t-sm t-red mid" x="170" y="18">shapes</text>
+        <text class="t-sm t-red mid" x="170" y="30">the task</text>
+        <path class="ln-red" d="M270 60 V118" marker-end="url(#ah-loop-red-t)"/>
+        <text class="t-sm t-red end" x="264" y="92">copied by follow-up work</text>
+        <path class="ln-red" d="M206 148 H100 V64" marker-end="url(#ah-loop-red-t)"/>
+        <text class="t-sm t-red" x="106" y="118">reused to compare</text>
+        <path class="ln" d="M30 60 V308" marker-end="url(#ah-loop-t)"/>
+        <text class="t-sm t-ink2" x="36" y="200">C/C++ data</text>
+        <path class="ln" d="M270 174 V224" marker-end="url(#ah-loop-t)"/>
+        <text class="t-sm t-ink2 end" x="264" y="203">same metrics, to compare</text>
+        <path class="ln" d="M270 280 V308" marker-end="url(#ah-loop-t)"/>
+        <text class="t-sm t-ink2" x="276" y="298">F1 scores</text>
+      </svg>
+      <figcaption><b>Feedback loops between datasets, formulations, baselines, and metrics.</b> Prominent function-level datasets encourage function-level solutions, which motivate the creation of additional function-level datasets; the availability of C/C++ datasets makes C/C++ the default language; and the lack of high-quality benchmarks compounds this by hindering comparability across solutions, making self-reported performance an unreliable measure of progress.</figcaption>
+    </figure>
+
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Overall trends</span><p>Programming language and dataset-related pain points fundamentally influence other aspects of the field, but the other pain points still stand as their own limitations for the field to overcome. Across many of the pain points we identified, we note a strong trend of following previous research among the analyzed articles, which we have already filtered to identify influential, highly cited work.</p></div>
+  </section>
+
+  <section class="psec" id="checklist">
+    <h2>ML4AVD Preflight Checklist</h2>
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">What is the Direction for Detection?</span><p>We recommend that future work critically engages with previous work in the field, not just at the technical level, but also conceptually. Thus, future work should seek to answer the correct question, taking into account the very real-world problem of vulnerability discovery in the context of the vulnerability life cycle. We recommend that future work critically evaluate the datasets it uses, according to the criteria we lay out, and choose datasets that are useful in answering its research question, rather than allowing dataset availability to influence the direction of the research.</p></div>
+    <div class="prose"><p>As a reference for future work, we present the main recommendations as an easy-to-follow checklist. Please note that these items are not independent and should be treated as a whole, rather than individual improvements.</p></div>
+    <div class="cards pair" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><span class="eyebrow red">Research question</span>
+        <ul>
+          <li>Contextualize vulnerability detection within the vulnerability life cycle and provide information required by subsequent stages: at least vulnerability type, but also code paths or trigger conditions.</li>
+          <li>Separate input and output granularities; use rich input (e.g., repository-level, graph IRs) to provide context and specific output (line-level) to pinpoint the vulnerability.</li>
+          <li>Choose datasets that support the research question, rather than the other way around; critically evaluate datasets to ensure they are high-quality and fit the research.</li>
+        </ul>
+      </div>
+      <div class="card"><span class="eyebrow red">Programming language</span>
+        <ul>
+          <li>Target languages that are underrepresented in the literature but widely used (e.g., PHP, Python).</li>
+          <li>Target multi-language projects.</li>
+          <li>Choose tools that support the research question, rather than allow the availability of tools to shape the choice of programming language.</li>
+          <li>Evaluate, rather than claim, cross-language transferability.</li>
+        </ul>
+      </div>
+      <div class="card"><span class="eyebrow red">Datasets</span>
+        <ul>
+          <li>Choose real-world datasets that sample from multiple projects.</li>
+          <li>Keep validation and test sets imbalanced; for training, under-sample benign data conservatively and retain each vulnerable sample’s patched counterpart; consider loss re-weighting.</li>
+          <li>Use fixed temporal train/test splits; do not use random splits.</li>
+          <li>Audit for poor labeling, duplicate data, and other quality issues; also de-duplicate after pre-processing, as some steps (e.g., slicing) can introduce duplicates.</li>
+          <li>Prefer datasets that are context-rich, containing higher granularities, paired samples, and vulnerability type and metadata.</li>
+          <li>Assume data leakage when working with pre-trained LLMs regardless of reported knowledge cutoffs; prefer leaderboards with hidden test data.</li>
+        </ul>
+      </div>
+      <div class="card"><span class="eyebrow red">Training</span>
+        <ul>
+          <li>Train contrastively on vulnerable/patched pairs to force class separation and prevent learning of spurious features.</li>
+          <li>Run ablation studies to ensure each component of a solution is contributing to the output.</li>
+          <li>Test generalization across projects, across datasets, and across code augmentations.</li>
+          <li>Use explainability techniques diagnostically, to surface spurious correlations.</li>
+          <li>Use generic regularization methods (e.g., dropout, early termination) alongside domain-specific methods to reduce overfitting.</li>
+        </ul>
+      </div>
+      <div class="card span-all"><span class="eyebrow red">Evaluation</span>
+        <ul>
+          <li>Provide a full replication package: code including pre-processing, weights/checkpoints, hyperparameters, random seeds, dataset versions (note: LLM prompts count as model parameterization); pin exact model versions and API parameters; prefer open-weight models where reproducibility matters.</li>
+          <li>Host on versioned platforms (Zenodo, OSF, Hugging Face, GitHub/GitLab/Codeberg) as independently hosted datasets and code can disappear.</li>
+          <li>Evaluate on realistic imbalanced test sets with time-based splits.</li>
+          <li>Verify that agentic solutions are not reward hacking.</li>
+          <li>Report PR-AUC and Recall@FPR across a range of FPR; keep F1 only for continuity; accuracy alone is invalid under realistic imbalance, and ROC-AUC is misleading because of its FPR dependence.</li>
+          <li>Report paired accuracy: the proportion of vulnerable/patched pairs in which both samples are classified correctly.</li>
+          <li>Provide a multi-class confusion matrix as additional material so any metric can be derived; provide a separate matrix for paired metrics.</li>
+          <li>Do not use newly published CVEs as a success metric, as it incentivizes spurious reporting.</li>
+          <li>Use interpretability and explainability techniques; do not rely on LLM self-explanation, which is often unfaithful; use black-box tools, GNN-specific explainers, or mechanistic interpretability.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="psec" id="agents">
+    <h2>ML4AVD in the Age of Agents</h2>
+    <div class="prose">
+      <p>There have been two major changes in recent years that have the potential to shape the future of the AVD field: first, the AI Cyber Challenge (AIxCC), one of the largest initiatives to date aimed at making automated detection, exploitation, and repair of vulnerabilities practical through advancements in LLMs; second, the rise of agentic AI, which has demonstrated rapidly improving capabilities in both producing and analyzing code at scale.</p>
+    </div>
+
+    <h3>Case Study: Was AIxCC a Step in the Right Direction?</h3>
+    <div class="prose">
+      <p>AIxCC was a competition designed to advance the state of autonomous vulnerability detection, exploitation, and repair. Teams developed Cyber Reasoning Systems (CRSs) that operated on version-controlled repositories containing full source code in C/C++ or Java of real-world open-source projects, including the Linux kernel, nginx, and Jenkins. The vulnerabilities were synthetically introduced by the competition organizers into the commit history of these host repositories, and participants were required to identify the vulnerability-inducing commits. A perfect solution had to autonomously perform detection, exploitation, and patching (removing the vulnerability while preserving the functionality of the code).</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b>48</b><span>challenge projects in the finals</span></div>
+      <div class="stat"><b>24</b><span>open-source repositories</span></div>
+      <div class="stat"><b>63</b><span>synthetic vulnerabilities</span></div>
+      <div class="stat"><b class="red">18</b><span>real, non-synthetic, vulnerabilities discovered by teams</span></div>
+    </div>
+
+    <div class="prose">
+      <p>The AIxCC scoring algorithm combines four assessed metrics to compute the overall team score: the Vulnerability Discovery Score (VDS), the Program Repair Score (PRS), a Diversity Multiplier (DM), and an Accuracy Multiplier (AM). The VDS and PRS are combined via a weighted logarithmic function, where patching is weighted approximately three times more heavily than discovery alone.</p>
+    </div>
+
+    <div class="compare" data-augmented-ui="tl-clip br-clip border">
+      <div class="pick">
+        <h4>Most impactful contributions</h4>
+        <ul>
+          <li>The decoupling of input and detection granularity (Pain Point 2).</li>
+          <li>The evaluation of multiple languages (Pain Point 4).</li>
+          <li>The in-competition enforcement of withheld test sets (Pain Point 8).</li>
+          <li>The validation of labels through sanitizer-based verification (Pain Point 6).</li>
+          <li>The use of an application-aware scoring function rather than generic classification metrics (Pain Point 11).</li>
+          <li>The embedding of detection within a full vulnerability life cycle pipeline, which addresses the broader concern that AVD is too often treated as a standalone classification task (Pain Point 1).</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Does not fully resolve</h4>
+        <ul>
+          <li>Synthetic injection of disclosed CVEs may have leaked into LLM training (Pain Point 8).</li>
+          <li>Commit-level output remains coarser than recommended (Pain Point 2).</li>
+          <li>Explanation quality is not directly evaluated (Pain Point 12).</li>
+        </ul>
+      </div>
+    </div>
+    <div class="prose">
+      <p>We contend that AIxCC is best understood not as a solution to the pain points of ML4AVD, but as a proof of concept that the research community can build upon: one that demonstrates how design can reshape research incentives toward more practical and operationally relevant approaches.</p>
+    </div>
+
+    <h3>Is ML4AVD still needed?</h3>
+    <div class="prose"><p>The rise of capable agentic LLMs raises a fair question for the future of the field: if general-purpose code-capable agents can already locate vulnerabilities in real codebases, as AIxCC’s CRSs demonstrated, then is dedicated ML4AVD research still needed or will it be subsumed by progress in foundation models? We argue that it remains both relevant and necessary, for three reasons.</p></div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Pain Points are Approach-Agnostic</h4><p>The methodological issues surfaced in section 5 are not artifacts of any single model architecture. They persist across the dominant approaches we observed (CNNs, RNNs, GNNs, and LLMs) and, in several cases, are aggravated by the move to LLMs: opaque training corpora make data contamination harder to rule out, agentic systems are vulnerable to reward hacking when test data is reachable, and LLM self-explanations are known to be unfaithful.</p></div>
+      <div class="card"><h4>Specialized Models Complement Agents</h4><p>Agentic detection pipelines are increasingly capable of integrating heterogeneous signals through tool use, which positions specialized ML4AVD models as components within broader systems rather than as standalone end-to-end solutions. Furthermore, specialization remains valuable beyond raw capability: it supports local deployment (privacy), low-latency in-IDE inference (cost), and reproducible evaluation through fixed open-weights.</p></div>
+      <div class="card"><h4>Need for Open Research</h4><p>Even as frontier models (e.g., Anthropic Mythos) push the commercial state-of-the-art on vulnerability discovery, their closed nature limits reproducibility, interpretability, and applicability in air-gapped or privacy-critical settings, which make sending code to an external API infeasible. Therefore, there is still scope for smaller open-weight models as they are needed both for scientific research and understanding as well as deployment scenarios where external large commercial models are not applicable.</p></div>
+    </div>
+    <div class="prose">
+      <p>Finally, as agentic coding frameworks are accelerating the rate at which software and vulnerabilities are produced, we argue that the demand for scalable and accurate detection grows as well. Therefore, what has changed is not whether AVD research is needed, but what shape it should take: less function-level binary classification on saturated benchmarks, more focused attention on building principled foundations.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="conclusion">
+    <h2>Conclusion</h2>
+    <ul class="takeaways">
+      <li><span>We analyzed 87 influential ML4AVD works across six dimensions – problem formulation, granularity, programming language, datasets, evaluation metrics, and ML approach – and identified <strong>twelve interconnected pain points</strong> that explain why the field has failed to show consistent progress despite a decade of sustained effort.</span></li>
+      <li><span>Our analysis indicates <strong>self-reinforcing cycles</strong> are present in ML4AVD research, which require future work to critically evaluate what came before, rather than look at incremental improvements.</span></li>
+      <li><span>The rise of agentic LLMs <strong>does not diminish the need for dedicated ML4AVD research</strong>.</span></li>
+      <li><span>The methodological pain points identified here are <strong>approach-agnostic</strong> and, in several cases, are aggravated by LLMs.</span></li>
+      <li><span>The need for <strong>improved open, small, and efficient ML4AVD models</strong> is still present, even if proprietary models are becoming increasingly capable.</span></li>
+    </ul>
+    <blockquote class="excerpt">
+      <p>The direction for detection is clear; what remains is the will to follow it.</p>
+    </blockquote>
+  </section>
+</Paper>
+
+<style is:global>
+  .card ul { margin: 8px 0 0; padding-left: 1.1em; }
+  .card li { font-size: 14.5px; line-height: 1.5; color: var(--bone); margin-bottom: 6px; }
+  .card li::marker { color: var(--red); }
+  .card.span-all { grid-column: 1 / -1; }
+  .cards.pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 560px) { .cards.pair { grid-template-columns: minmax(0, 1fr); } }
+  .ex-panel .chart { margin-top: 18px; }
+  .ex-panel .legend { margin-top: 0; }
+  .data-table td.c, .data-table th.c { text-align: center; }
+  .stat span.nb { display: inline; margin: 0; white-space: nowrap; }
+  .data-table th.wrap { white-space: normal; }
+  .data-table .yr-in { display: none; }
+  .figure .dg-tall { display: none; }
+  @media (max-width: 640px) {
+    .figure .dg-wide { display: none; }
+    .figure .dg-tall { display: block; max-width: 420px; margin-inline: auto; }
+  }
+  @media (max-width: 560px) {
+    .data-table.ds { font-size: 13.5px; }
+    .data-table.ds th, .data-table.ds td { padding-right: 6px; }
+    .data-table.ds th { white-space: normal; }
+    .data-table.ds .yr { display: none; }
+    .data-table.ds .yr-in { display: block; font-size: 12.5px; color: var(--ash); }
+  }
+</style>
