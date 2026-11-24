@@ -284,13 +284,13 @@ main { padding-top: calc(var(--head-h) + env(safe-area-inset-top, 0px)); }
   .pub__year { font-size: 24px; }
 }
 
-.repo__lang { font-stretch: 112%; font-weight: 700; font-size: 15px; line-height: 1.25; color: var(--bone); }
-.repo__stats { font-size: 14px; color: var(--ash); }
+.repo__stat { display: grid; gap: 6px; font-stretch: 125%; font-weight: 820; font-size: 15px; line-height: 1; color: var(--ash); }
+.repo__stat b { font-weight: inherit; font-size: 30px; line-height: 0.9; color: var(--bone); }
 .repo__slug { font-family: var(--f-term); font-size: 13px; color: var(--ash); margin: 6px 0 0; overflow-wrap: anywhere; }
 .pub.repo > div:last-child { max-width: var(--measure); }
 .repo__desc { font-size: 16px; line-height: 1.55; margin: 10px 0 0; }
-.repo__topics { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--f-term); font-size: 12.5px; color: var(--ash); }
-@media (max-width: 640px) { .pub.repo .pub__meta { gap: 12px; } }
+.repo__topics { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-family: var(--f-term); font-size: 12.5px; color: var(--red); }
+@media (max-width: 640px) { .repo__stat { display: flex; align-items: baseline; gap: 8px; } .repo__stat b { font-size: 24px; } }
 
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 20px; }
 .filter {

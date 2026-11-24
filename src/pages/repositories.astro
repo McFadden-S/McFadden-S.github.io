@@ -4,7 +4,7 @@ import { repos, repoStats } from '../data/repos';
 import { byId } from '../data/papers';
 
 const intro = 'Links to relevant research repositories I have worked on.';
-const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const unit = (n: number, word: string) => `${word}${n === 1 ? '' : 's'}`;
 ---
 <Base title="Repositories" description={intro} active="repositories">
   <div class="wrap">
@@ -21,8 +21,7 @@ const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
         return (
           <li class="pub repo">
             <div class="pub__meta">
-              {s?.language && <span class="repo__lang">{s.language}</span>}
-              {s && <span class="repo__stats">{count(s.stars, 'star')}{s.forks > 0 && `, ${count(s.forks, 'fork')}`}</span>}
+              {s && <span class="repo__stat"><b>{s.stars}</b> {unit(s.stars, 'star')}</span>}
             </div>
             <div>
               <h2 class="pub__title"><a href={url}>{r.name}</a></h2>
