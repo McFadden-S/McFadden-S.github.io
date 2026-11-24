@@ -32,6 +32,30 @@ export const ME = 'Shae McFadden';
 
 export const papers: Paper[] = [
   {
+    id: 'malsets',
+    short: 'MalSets',
+    title: 'More Is Never Less: Affordable Robustness to Additive Attacks via Monotone Multiple-Instance Learning',
+    authors: ['Alexander Herzog', 'Shae McFadden', 'Lorenzo Cavallaro'],
+    abbr: 'arXiv',
+    venue: 'arXiv preprint (cs.CR)',
+    year: 2026,
+    type: 'preprint',
+    topic: 'malware',
+    selected: true,
+    links: [
+      { label: 'arXiv', href: 'https://arxiv.org/abs/2611.28825' },
+      { label: 'PDF', href: 'https://arxiv.org/pdf/2611.28825' },
+    ],
+    bibtex: `@misc{herzog2026lessaffordablerobustnessadditive,
+      title={More Is Never Less: Affordable Robustness to Additive Attacks via Monotone Multiple-Instance Learning},
+      author={Alexander Herzog and Shae McFadden and Lorenzo Cavallaro},
+      year={2026},
+      eprint={2611.28825},
+      archivePrefix={arXiv},
+      primaryClass={cs.CR}
+}`,
+  },
+  {
     id: 'replicant',
     short: 'REPLICANT',
     title: 'REPLICANT: Learning Policies for Evading and Hardening Malware Detectors',
@@ -176,7 +200,7 @@ export const papers: Paper[] = [
     title: 'One Pic is All it Takes: Poisoning Visual Document Retrieval Augmented Generation with a Single Image (Short Paper)',
     authors: ['Ezzeldin Shereen', 'Dan Ristea', 'Burak Hasircioglu', 'Shae McFadden', 'Vasilios Mavroudis', 'Chris Hicks'],
     abbr: 'ACL Workshop',
-    venue: '2nd Workshop on Multimodal Augmented Generation via MultimodAl Retrieval',
+    venue: '1st Workshop on Multimodal Augmented Generation via Multimodal Retrieval (Non-Archival)',
     year: 2025,
     type: 'workshop',
     topic: 'rag',
@@ -188,7 +212,7 @@ export const papers: Paper[] = [
     bibtex: `@misc{shereen2025OnePic,
       title={One Pic is All it Takes: Poisoning Visual Document Retrieval Augmented Generation with a Single Image (Short Paper)},
       author={Ezzeldin Shereen and Dan Ristea and Burak Hasircioglu and Shae McFadden and Vasilios Mavroudis and Chris Hicks},
-      booktitle={2nd Workshop on Multimodal Augmented Generation via MultimodAl Retrieval},
+      booktitle={1st Workshop on Multimodal Augmented Generation via Multimodal Retrieval (Non-Archival)},
       year={2025}
 }`,
   },
@@ -312,6 +336,7 @@ export const papers: Paper[] = [
 export const byId = Object.fromEntries(papers.map((p) => [p.id, p])) as Record<string, Paper>;
 
 export const CITATIONS: [string, string][] = [
+  ['malsets', 'replicant'], ['malsets', 'drmd'], ['malsets', 'alpoison'], ['malsets', 'tesseract'], ['malsets', 'rpal'],
   ['replicant', 'sok'], ['replicant', 'acdenv'], ['replicant', 'drmd'], ['replicant', 'onepic'], ['replicant', 'alpoison'], ['replicant', 'tesseract'], ['replicant', 'wendigo'], ['replicant', 'rpal'],
   ['sok', 'acdenv'], ['sok', 'drmd'], ['sok', 'onepic'], ['sok', 'alpoison'], ['sok', 'tesseract'], ['sok', 'wendigo'], ['sok', 'rpal'],
   ['direction', 'sok'], ['direction', 'drmd'], ['direction', 'alpoison'], ['direction', 'tesseract'], ['direction', 'rpal'],

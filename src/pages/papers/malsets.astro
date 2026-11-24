@@ -1,0 +1,551 @@
+---
+import Paper from '../../layouts/Paper.astro';
+const sections = [
+  { id: 'introduction', label: 'Introduction' },
+  { id: 'background', label: 'Background' },
+  { id: 'malsets', label: 'From DEEPDREBIN to MALSETS' },
+  { id: 'settings', label: 'Experimental settings' },
+  { id: 'results', label: 'Results' },
+  { id: 'limitations', label: 'Limitations' },
+  { id: 'contributions', label: 'Contributions' },
+];
+---
+<Paper id="malsets" affils={['University College London', 'King’s College London', 'The Alan Turing Institute', 'Core64', 'MBZUAI']} sections={sections}>
+  <Fragment slot="abstract">
+    <p>Static malware detectors that represent each sample as a bag of extracted features, such as permissions, API calls, or imported functions, are cheap to deploy and remain state-of-the-art under temporal drift and in selective classification. Yet, attackers can evade them by adding benign-looking content that outweighs malicious evidence. Canonically, detectors encode the presence of a few thousand features, selected during training, as sparse multi-hot vectors over a fixed vocabulary. Features that emerge after training remain invisible. We show that linear models and multi-layer perceptrons (MLPs) over this input are sum-pooled set models in disguise. Sum-pooling lets added benign features cancel malicious evidence. Instead, we cast malware detection with set-shaped static features as a multiple-instance learning (MIL) problem. To this end, we propose MalSets, which uses max-pooled Deep Sets models with a monotone head to ensure that any malicious evidence remains undiluted; thus, more is never less. Under MIL, a general text encoder maps any feature string to an embedding, thus eliminating the long-standing out-of-vocabulary problem at test time. Max-pooling retains the malicious evidence regardless of how many benign features an attacker adds. Since max-pooling can only grow when features are added, constraining the head alone makes the malware score monotone under additions, even against a white-box attacker adapted to this architecture. While monotone detectors are never evaded by state-of-the-art black-box or white-box attacks, they often significantly pay for this robustness in clean performance since benign features cannot count as evidence. However, by combining a non-monotone set encoder with max-pooling and a monotone head, MalSets maintains the robustness of prior monotone classifiers while achieving state-of-the-art performance.</p>
+  </Fragment>
+
+  <section class="psec" id="introduction">
+    <h2>Introduction</h2>
+    <div class="prose">
+      <p>More than twenty years ago, Lowd and Meek showed that adversaries could evade spam filters, using bag-of-words (BoW)-based representations, by embellishing a message with a few “good words” that were associated with legitimate email. However, to this day, the use of static analysis to construct BoW-like feature representations still remains state-of-the-art in malware detection as a key first line of defence because feature extraction remains lightweight allowing for inexpensive classification at scale.</p>
+      <p>Like the BoW-based representations considered by Lowd and Meek, these abstractions record the presence or frequency of extracted features. Commonly considered features for malware detection include: imported libraries and functions for executables; keywords and structural paths for PDFs; syntax-annotated tokens for JavaScript; and permissions, API usage, and metadata for Android applications and software packages. Although individual features may also encode local structure, their aggregation is permutation invariant. We call such feature abstractions, or extractors, <span class="term">set-shaped</span>.</p>
+      <p>Depending on their design, these extractors omit structural or semantic relationships, such as caller-callee dependencies. This creates a representation gap between the sample, that is, the application, executable, or document under analysis, and the information available to the detector. An attacker can exploit this gap through <span class="term">additive attacks</span>: inserting benign-looking code or data, subject to validity and attack-budget constraints. Modifications are commonly restricted to additions in order to avoid removing components that the malware relies on to execute malicious behavior.</p>
+      <p>Such attacks have been studied against PDF, executable, and Android detectors, both in feature space and on the samples themselves. Liang et al. evaded Chrome’s then-deployed phishing-page classifier by inserting benign-associated features. Šrndić and Laskov reduced PDFRATE’s scores from nearly 100% to a median of approximately 33% through content insertion. Pierazzi et al. evaded Android malware detectors by transplanting code from benign applications, an attack known as APG. In each case, features associated with benign samples outweigh evidence of maliciousness that is still present. To be robust against additive attacks, a detector must retain a malicious classification under every admissible functionality-preserving addition.</p>
+      <p>Static extractors analyze samples without executing their code. While the feature categories they produce are fixed, the vocabulary may be open-ended: identifiers, domain names, and structural paths absent from the training data may continue to appear under temporal drift. Nonetheless, detectors represent each sample as a multi-hot or count vector over a vocabulary selected at training time. Alternatively, they hash feature strings into a fixed number of bins at the cost of collisions. In both cases, they learn from this feature representation rather than from the raw data. Therefore, the chosen encoding decides what the detector can actually see. Kolter and Maloof keep only 500 of more than 255 million byte 4-grams. Šrndić and Laskov retain 6,087 of more than 9 million structural PDF paths.</p>
+    </div>
+
+    <h3>Set models in disguise</h3>
+    <div class="prose">
+      <p>Since the multi-hot vector encodes an application’s feature set, every detector computes a function of that set. Linear models and Multi-Layer Perceptrons (MLPs), two of the four detector classes, share a specific structure. For an application with feature set <i>S</i>, the multi-hot vector is the indicator vector 1<sub><i>V</i></sub>(<i>S</i>) over the fixed vocabulary <i>V</i>. The first layer of these models computes <i>W</i><sub>1</sub>1<sub><i>V</i></sub>(<i>S</i>) = ∑<sub><i>s</i>∈<i>S</i>∩<i>V</i></sub> <i>w<sub>s</sub></i>, where <i>w<sub>s</sub></i> is the column of <i>W</i><sub>1</sub> assigned to feature <i>s</i>. This layer is therefore a lookup table of learned feature embeddings followed by implicit SUM pooling; in linear models, the embeddings reduce to scalar weights. Tree ensembles also compute a function of the set, but they split on individual coordinates instead of summing embeddings. Hence, linear and MLP-based detectors on binary representations are set models in disguise, namely SUM-pooled Deep Sets models over a vocabulary fixed at training time. This explains both weaknesses discussed above.</p>
+    </div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Blind to unseen strings</h4><p>First, strings outside the training vocabulary are never encoded, so these models are blind to out-of-vocabulary (OOV) strings.</p></div>
+      <div class="card"><h4>Benign features outweigh malicious ones</h4><p>Second, SUM pooling allows added benign features to outweigh malicious evidence, which is exactly how additive benign attacks succeed.</p></div>
+    </div>
+    <div class="prose">
+      <p>We break with this tradition and embed each feature, <i>s</i> ∈ <i>S</i>, with a general text encoder instead. Since DREBIN features are set-shaped and the cardinality varies between samples, we cast detection as <span class="term">multiple-instance learning</span> (MIL). MIL has modeled network traffic and spam emails as bags before. We instantiate MIL via Deep Sets with MAX pooling, which retains malicious evidence of the sample, regardless of how much benign evidence is added.</p>
+      <p>MAX-pooled Deep Sets models preserve malicious evidence in the latent representation. However, a downstream classifier head may still map a larger latent representation to a lower score, which an attacker can exploit. To retain a malware classification under any addition that maintains malicious evidence, the score must never decrease when features are added. Gimenez et al. show that this monotonicity is both sufficient and necessary for robustness to additive attacks. Monotone malware detectors exist, but so far they have come at a twofold cost. First, they operate on a fixed vocabulary, so features seen after the training period add no evidence; thus, they are blind to OOV features. Second, they lose detection performance. Since no feature may lower the score, benign features cannot count as evidence. Incer et al. report a drop of approximately 13% in detection rate, which they consider the <span class="term">cost of security</span>.</p>
+    </div>
+  </section>
+
+  <section class="psec" id="background">
+    <h2>Background</h2>
+
+    <h3>Set-Shaped Static Features</h3>
+    <div class="prose">
+      <p>A static feature extractor <i>E</i> maps a sample <i>z</i>, such as an application, to a finite set of strings <i>S</i> = <i>E</i>(<i>z</i>) ⊂ Σ<sup>∗</sup>, where Σ<sup>∗</sup> denotes all strings. Each string, <i>s</i> ∈ <i>S</i>, represents one feature in <i>z</i>, such as a requested permission or an API call. The extractor, <i>E</i>, may yield features of different categories. For example, the Drebin extractor considers multiple categories, where a prefix, <code>api_permissions</code>, denotes the category of the feature: <code>api_permissions::android_permission_SEND_SMS</code>. These features are set-shaped, and their order carries no information (permutation-invariant). Furthermore, the number of features, |<i>S</i>|, varies among samples (varying set-cardinality).</p>
+      <p>Feature categories are known in advance, but the vocabulary is open: Σ<sup>∗</sup> is infinite, whereas the set of strings observed during the training-phase of detectors is finite. We call a feature category closed if its strings come from a finite list known in advance, such as the permissions an operating system defines, and open otherwise. During the test-phase, a sample contains out-of-vocabulary (OOV) strings whenever <i>S</i> includes strings never observed during training.</p>
+    </div>
+
+    <h3>Multi-Hot Encoding over a Fixed Vocabulary</h3>
+    <div class="prose">
+      <p>Detectors on set-shaped features rarely consume <i>S</i> directly. Instead, the canonical approach during preprocessing follows two steps. (1) During Feature selection, each detector selects a vocabulary <i>V</i> from the strings observed in its training data. Feature selection can be supervised or unsupervised. To preserve temporal training consistency, selection must precede the test-period. (2) During multi-hot encoding, each sample is encoded as a binary vector <i>x</i> ∈ {'{'}0, 1{'}'}<sup>|<i>V</i>|</sup> with one coordinate per string in <i>V</i>, set to 1 if the string occurs in <i>S</i>.</p>
+      <p>The encoding inherits the permutation invariance of <i>S</i> and maps features <i>s</i> ∈ <i>S</i> to the selected |<i>V</i>| coordinates. This discards features outside <i>V</i>, therefore, two samples that differ only by strings outside <i>V</i> are encoded with the same feature-vector, <i>x</i>. Yang et al. mention this constraint: a temporal split “means we cannot use any new features that only appear in the testing set”.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b class="red">85%</b><span>of distinct strings in the Hypercube test period never occur in the training year</span></div>
+      <div class="stat"><b>28%</b><span>median share of an app’s strings kept by the top-10,000 vocabulary in the training year (27% over the test period)</span></div>
+      <div class="stat"><b>545,333</b><span>strings in the full Drebin feature set, which later work restricts to 10,000</span></div>
+    </div>
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Key Takeaway</span><p>While feature-selection may differ among methods, the representation, <i>x</i>, and its dependence on a fixed vocabulary, <i>V</i>, at training time do not.</p></div>
+
+    <h3>Multiple-Instance Learning</h3>
+    <div class="prose">
+      <p>Multiple-instance learning (MIL) labels bags of instances rather than single instances, and under its standard assumption, a bag is positive if at least one of its instances is positive. Since set-shaped features are bags by construction, with the sample as the bag <i>S</i> and each string as an instance, neural MIL embeds every instance and aggregates the embeddings by pooling into one bag representation. Under MEAN and SUM pooling, when instance embeddings can be negative, added instances can lower every coordinate of the set representation and thereby dilute the evidence of a positive instance. MAX pooling preserves the standard assumption under which a bag’s label is the maximum of its instance labels in the embeddings. Hence, each coordinate of the bag representation is the largest value among its instances. Lowering the value is not possible; values either increase or leave the representation unchanged.</p>
+    </div>
+
+    <h3>Threat Model</h3>
+    <div class="prose">
+      <p>We assume an adversary who controls the sample (Android APKs in our evaluations) but cannot change the deployed feature extractor or the trained model. The goal is evasion: to classify a malware sample as benign. A feature-space attack that perturbs the feature vector directly provides only a theoretical upper-bound, since an arbitrary vector does not necessarily correspond to a working APK. Hence, we evaluate in the problem space following Pierazzi et al., where an attacker applies a transformation <i>T</i> to the APK <i>z</i>, subject to four constraints: (i) available transformations, (ii) preserved semantics, (iii) plausibility, and (iv) robustness to preprocessing.</p>
+      <p>We take the available-transformations constraint to be addition only, <i>E</i>(<i>z</i>) ⊆ <i>E</i>(<i>T</i>(<i>z</i>)), preserving the host’s malicious functionality. To this end, we adopt <span class="term">organ transplantation</span>, where bytecode slices harvested from benign donor apps are grafted into a malicious host. An organ <i>o</i> is the self-contained bytecode slice of a harvested gadget, and an ice-box <i>O</i> is the bank of organs assembled ahead of the attack time. A graft is the set union <i>S</i> ↦ <i>S</i> ∪ <i>o</i>, where <i>o</i> also denotes the strings that the organ adds, including side-effect features that satisfy the problem-space constraints. Removal and obfuscation are feasible but violate <i>E</i>(<i>z</i>) ⊆ <i>E</i>(<i>T</i>(<i>z</i>)); we treat them as out of scope.</p>
+    </div>
+
+    <h3>Why Android?</h3>
+    <div class="prose">
+      <p>Our findings apply to set-shaped static features in general, however, we chose Android malware detection (AMD) as the domain for our evaluations because it fulfills the following four requirements:</p>
+    </div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Set-Shaped Features with an Open Vocabulary</h4><p>The Drebin extractor emits strings in nine fixed categories. Their vocabulary is open.</p></div>
+      <div class="card"><h4>One Representation with Many Detectors</h4><p>Linear, tree-based, and neural detectors, including drift-aware ones, share the multi-hot vector <i>x</i> over Drebin features. Hence, the representation is the only variable we change.</p></div>
+      <div class="card"><h4>Realizable Additive Attacks</h4><p>Organ transplantation yields an evasive variant for each malware sample in all four configurations studied by Pierazzi et al.</p></div>
+      <div class="card"><h4>Time-Aware Evaluation at Scale</h4><p>Time-aware evaluation protocols are established for Android, and Hypercube provides 224,965 applications from a single market (Google Play) over four years, each dated by its upload and labeled with its number of VirusTotal detections (VTT).</p></div>
+    </div>
+  </section>
+
+  <section class="psec" id="malsets">
+    <h2>From DEEPDREBIN to MALSETS</h2>
+    <div class="prose">
+      <p>DEEPDREBIN (Ⓐ) is a feed-forward network on input <i>x</i>. At its first layer, it computes the vector <i>r</i> = <i>W</i><sub>1</sub><i>x</i> with the weights <i>W</i><sub>1</sub> ∈ ℝ<sup>200×|<i>V</i>|</sup>. The classification head ρ comprises all subsequent operations. It starts with the first-layer bias <i>b</i> and activation σ, which give the first hidden layer <i>h</i> = σ(<i>r</i> + <i>b</i>) and maps <i>r</i> to a malware logit, which a sigmoid converts to P(mal). We focus on these layers as <i>x</i> treats the first layer as a lookup table (①) that is implicitly sum-aggregated (②) over a closed vocabulary (③) while ρ is easily overwhelmed by contrary evidence (④).</p>
+      <p>DEEPSETS (panels Ⓑ–Ⓓ) is multiple-instance learning (MIL) applied to learning functions over sets, where a shared element-wise MLP φ : ℝ<sup><i>d</i></sup> → ℝ<sup><i>d</i><sub>φ</sub></sup>, the element network, maps each embedded feature to a latent representation. These representations form the rows of a matrix <i>H</i>. The set of these representations is then aggregated into a single vector, the pooled vector <i>r</i>, by a pooling operator ⊕,</p>
+    </div>
+    <div class="op-eq" role="group" aria-label="Equation 1" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>r</i>(<i>S</i>) := ⊕<sub><i>s</i>∈<i>S</i></sub> φ(<i>e</i>(<i>s</i>)) ∈ ℝ<sup><i>d</i><sub>φ</sub></sup> for any finite <i>S</i> ⊂ Σ<sup>∗</sup>,</span><em>(1)</em></div>
+    </div>
+    <div class="prose">
+      <p>with <i>r</i> = <i>r</i>(<i>S</i>) for the application, <i>e</i> : Σ<sup>∗</sup> → ℝ<sup><i>d</i></sup> encoding each string, ⊕<sub><i>s</i>∈<i>S</i></sub> denoting the pooling operator ⊕, applied to all feature vectors φ(<i>e</i>(<i>s</i>)). The classification head ρ then maps <i>r</i>(<i>S</i>) to a malware logit. This formulation makes the individual feature representations explicit (①), allowing us to change the pooling operator (②), replace the fixed vocabulary with an encoder for unseen strings (③), and replace the unconstrained classification head ρ with a monotone head <i>g</i> (④).</p>
+    </div>
+
+    <ol class="steps">
+      <li><div><h4>Features as Sets</h4><p>Step 1 splits <i>x</i> into the set <i>U</i> of one-hot elements;</p></div></li>
+      <li><div><h4>Max Pooling</h4><p>Step 2 replaces SUM by MAX, and φ is an MLP from panel <span class="fig-panel">C</span> onward;</p></div></li>
+      <li><div><h4>Open-Vocabulary Encoder</h4><p>Step 3 maps every feature string with a frozen general text encoder <i>e</i> to an embedding;</p></div></li>
+      <li><div><h4>Monotone Head</h4><p>Step 4 classifies with a monotone head <i>g</i>.</p></div></li>
+    </ol>
+
+    <figure class="figure fig-tikz" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+        <a href="/img/papers/malsets-figure2.svg" target="_blank" rel="noopener">
+          <img class="crt-off" src="/img/papers/malsets-figure2.svg" width="890" height="328" loading="lazy" decoding="async" alt="From DEEPDREBIN to MALSETS in four panels, using the strings SEND_SMS, getDeviceId and BOOT_COMPLETED. Panel A, DEEPDREBIN: the multi-hot vector x looks up three rows of the transposed W1, which are summed to r = 4 3 9 -1 5 6, then h = 0 0 5 0 1 2, then the head rho gives P(mal). Step 1, Set: panel B, DEEPSETS with SUM pooling, encodes each string as a one-hot row, applies W1 and sums the rows of H to the same r and h. Step 2, MAX-Pooling: panel C, DEEPSETS with MAX pooling and an MLP element network, takes the largest value in each column of H, r = 4 3 5 4 5 3. Step 3, Domain: panel D, MALSETS, embeds every string with a text encoder e into 3072 dimensions before the element network, and max pooling gives r = 4 5 5 4 5 3. Step 4, Monotone: MALSETS classifies r with a monotone head g." />
+          <img class="crt-on" src="/img/papers/malsets-figure2-crt.svg" width="890" height="328" loading="lazy" decoding="async" alt="From DEEPDREBIN to MALSETS in four panels, using the strings SEND_SMS, getDeviceId and BOOT_COMPLETED. Panel A, DEEPDREBIN: the multi-hot vector x looks up three rows of the transposed W1, which are summed to r = 4 3 9 -1 5 6, then h = 0 0 5 0 1 2, then the head rho gives P(mal). Step 1, Set: panel B, DEEPSETS with SUM pooling, encodes each string as a one-hot row, applies W1 and sums the rows of H to the same r and h. Step 2, MAX-Pooling: panel C, DEEPSETS with MAX pooling and an MLP element network, takes the largest value in each column of H, r = 4 3 5 4 5 3. Step 3, Domain: panel D, MALSETS, embeds every string with a text encoder e into 3072 dimensions before the element network, and max pooling gives r = 4 5 5 4 5 3. Step 4, Monotone: MALSETS classifies r with a monotone head g." />
+        </a>
+      </div>
+      <figcaption>From DEEPDREBIN to MALSETS: Step <span class="fig-step">1</span> splits <i>x</i> into the set <i>U</i> of one-hot elements; Step <span class="fig-step">2</span> replaces SUM by MAX, and φ is an MLP from panel <span class="fig-panel">C</span> onward; Step <span class="fig-step">3</span> maps every feature string with a frozen general text encoder <i>e</i> to an embedding; Step <span class="fig-step">4</span> classifies with a monotone head <i>g</i>. Panels <span class="fig-panel">A</span> to <span class="fig-panel">D</span> are rows 1, 1a, 3 and 11 of Table 2.</figcaption>
+    </figure>
+
+    <h3>Features as Sets</h3>
+    <div class="prose">
+      <p>We show that MLPs including DEEPDREBIN on multi-hot encoded features can compute the same function as DEEPSETS models on one-hot features, following our construction. First, we convert the multi-hot encoding <i>x</i>, which encodes the feature strings of a sample <i>S</i> ∩ <i>V</i> = {'{'}<i>s</i><sub>1</sub>, …, <i>s<sub>k</sub></i>{'}'}, to a set of one-hot vectors <i>U</i> = {'{'}<i>u</i><sub>1</sub>, …, <i>u<sub>k</sub></i>{'}'} (①), encoding each feature <i>s<sub>i</sub></i> as <i>u<sub>i</sub></i>. Second, we construct a DEEPSETS model, where we parameterize φ with a linear layer, <i>W</i><sub>1</sub>. The product <i>W</i><sub>1</sub><i>x</i> in DEEPDREBIN then equals <i>W</i><sub>1</sub> applied to each <i>u<sub>i</sub></i> ∈ <i>U</i> and summed:</p>
+    </div>
+    <div class="op-eq" role="group" aria-label="Equation 2" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>r</i> = ∑<sub><i>i</i></sub> φ(<i>u<sub>i</sub></i>) = ∑<sub><i>s</i>∈<i>S</i>∩<i>V</i></sub> <i>w<sub>s</sub></i> = <i>W</i><sub>1</sub> ∑<sub><i>i</i></sub> <i>u<sub>i</sub></i> = <i>W</i><sub>1</sub><i>x</i>,</span><em>(2)</em></div>
+    </div>
+    <div class="prose">
+      <p>While MLPs implicitly compute a sum over the selected row-vectors to obtain <i>r</i>, we explicitly select SUM pooling for our DEEPSETS model in this context.</p>
+    </div>
+
+    <h3>Max Pooling</h3>
+    <div class="prose">
+      <p>After having established DEEPDREBIN as a SUM-pooled set model, we replace the SUM pooling with a coordinate-wise MAX pooling, <i>r<sub>j</sub></i> = max<sub><i>i</i></sub> <i>H<sub>ij</sub></i> (②).</p>
+      <p>We call the coordinates of DEEPDREBIN’s first hidden layer <i>h</i> and of the pooled vector <i>r</i> of DEEPSETS models <span class="term">channels</span>. For each channel, we compute the gradient attribution, <i>w̄<sub>j</sub></i> = E[∂<i>f</i>/∂<i>r<sub>j</sub></i>], as the average gradient of the score over the training set. In the context of binary malware classification, we refer to its sign as the channel’s <span class="term">polarity</span>: malware if <i>w̄<sub>j</sub></i> &gt; 0 and benign if <i>w̄<sub>j</sub></i> &lt; 0. As polarity is an average, it need not hold for every application.</p>
+      <p>Additive benign attacks dilute malicious evidence under SUM pooling (panels Ⓐ and Ⓑ), by: (i) lowering a malware-polarity channel or (ii) raising a benign-polarity channel.</p>
+    </div>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Cancellation</h4><p>First, evidence is lost due to cancellation. In DEEPDREBIN, sample features map to columns <i>w<sub>s</sub></i>, aggregated by SUM pooling prior to activation. Since entries in <i>w<sub>s</sub></i> can be either positive or negative, they may cancel out evidence. Specifically, when a benign organ <i>o</i> is grafted into a host <i>S</i>, malicious evidence in <i>h</i> may be diminished.</p></div>
+      <div class="card"><h4>Accumulation</h4><p>Second, the evidence is outweighed by feature accumulation. Suppose every contribution is non-negative and no cancellation occurs. A channel’s value no longer distinguishes one informative feature from many features with small contributions. Attacks can therefore raise benign-polarity channels by adding more benign features to outweigh the host’s malicious features.</p></div>
+    </div>
+
+    <figure class="figure fig-tikz" data-augmented-ui="tl-clip br-clip border" style="--phone-w: 640px">
+      <div class="scroll-x">
+        <a href="/img/papers/malsets-figure3.svg" target="_blank" rel="noopener">
+          <img class="crt-off" src="/img/papers/malsets-figure3.svg" width="500" height="138" loading="lazy" decoding="async" alt="Share of applications in which a channel is active, clean against attacked by white-box APG at 100 organs. DEEPDREBIN: benign-polarity channels 18 to 29%, malware-polarity channels 28 to 13%. DEEPSETS with SUM pooling: benign 50 to 64%, malware 31 to 42%. DEEPSETS with MAX pooling: benign 63 to 71%, malware unchanged. MALSETS: malware-polarity channels unchanged." />
+          <img class="crt-on" src="/img/papers/malsets-figure3-crt.svg" width="500" height="138" loading="lazy" decoding="async" alt="Share of applications in which a channel is active, clean against attacked by white-box APG at 100 organs. DEEPDREBIN: benign-polarity channels 18 to 29%, malware-polarity channels 28 to 13%. DEEPSETS with SUM pooling: benign 50 to 64%, malware 31 to 42%. DEEPSETS with MAX pooling: benign 63 to 71%, malware unchanged. MALSETS: malware-polarity channels unchanged." />
+        </a>
+      </div>
+      <figcaption>The Effect of Attacks on Channels. Share of applications (%) in which a channel of <i>h</i> (DEEPDREBIN) or <i>r</i> (Deep Sets models) is active, split by polarity (benign left, malware right) and ordered by their average polarity over the training set. The shading reflects average polarity magnitude. Lines are smoothed as a running mean over 15 channels. Models are rows 1, 6, 5 and 11 of Table 2.</figcaption>
+    </figure>
+
+    <div class="prose">
+      <p>In DEEPDREBIN, the attack lowers the malware-polarity channels (28 → 13% active). In DEEPSETS[MAX, <i>e</i>, Σ<sup>∗</sup>], it cannot lower any channel and succeeds by raising the benign-polarity channels alone (63 → 71%), while the malware-polarity channels remain unchanged. Hence, MAX-pooling narrows the attack surface; however, the non-monotone head still allows raised benign-polarity channels to outweigh malicious evidence.</p>
+      <p>In our DEEPSETS models, φ embeds features individually and independently. Hence, grafting benign organs <i>S</i> ↦ <i>S</i> ∪ <i>o</i> leaves the host’s rows of <i>H</i> unchanged. Values of the MAX pooled vector, <i>r</i>, therefore, can only increase,</p>
+    </div>
+    <div class="op-eq" role="group" aria-label="Equation 3" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>r</i>(<i>S</i> ∪ <i>o</i>) = <i>r</i>(<i>S</i>) ∨ <i>r</i>(<i>o</i>) ≥ <i>r</i>(<i>S</i>).</span><em>(3)</em></div>
+    </div>
+    <div class="prose">
+      <p>Which requires that perturbations are additive and that φ maps every string of the host to a row of <i>H</i>. For each channel <i>j</i>, the feature that sets its value is referred to as the channel’s <span class="term">witness</span>, <i>s</i><sup>⋆</sup><sub><i>j</i></sub> ∈ arg max<sub><i>s</i>∈<i>S</i></sub> φ<sub><i>j</i></sub>(<i>s</i>). At most <i>d</i><sub>φ</sub> witnesses produce the pooled vector <i>r</i>. An added feature changes a channel only if it exceeds that channel’s witness. Therefore, the largest impact that an attack can have on a channel is bound by the organ <i>o</i> ∈ <i>O</i>, which produces the greatest value in that channel.</p>
+    </div>
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">The Classifier Bottleneck</span><p>Eq. 3 only holds for the pooled vector <i>r</i> and not for the score, which the classifier ρ computes from <i>r</i> (<span class="fig-panel">C</span>). Therefore, if the weights of the classifier ρ are not strictly positive, then raising a channel can lower the score. The classifier is thus the only part of a MAX-pooled DEEPSETS model that an additive attack can exploit. A monotone head <i>g</i>, whose score never falls when a channel rises, leaves the attacker with nothing to exploit.</p></div>
+
+    <h3>Open-Vocabulary Encoder</h3>
+    <div class="prose">
+      <p>MLP-based detectors trained on multi-hot representations, <i>x</i> = 1<sub><i>V</i></sub>(<i>S</i>) over a fixed vocabulary <i>V</i>, map input-features to columns of the weight-matrix <i>W</i><sub>1</sub>; features outside of <i>V</i> have no input coordinates and therefore no row in <i>H</i>. We remove this fixed-vocabulary constraint, see ③ and Ⓓ, and replace <i>V</i> with a general text encoder <i>e</i> : Σ<sup>∗</sup> → ℝ<sup><i>d</i></sup> that embeds each feature string:</p>
+    </div>
+    <div class="op-eq" role="group" aria-label="Equation 4" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>r</i>(<i>S</i>) = max<sub><i>s</i>∈<i>S</i></sub> φ(<i>e</i>(<i>s</i>)).</span><em>(4)</em></div>
+    </div>
+    <div class="prose">
+      <p>Which requires an open-vocabulary encoder, <i>e</i>, that is defined over all features of Σ<sup>∗</sup>. Hence, every feature that the extractor, <i>E</i>, emits receives an embedding. Therefore, the shared trainable instance network φ and the classifier ρ of our DEEPSETS models remain independent of the vocabulary <i>V</i> fixed at training time.</p>
+    </div>
+
+    <h3>Monotone Head</h3>
+    <div class="prose">
+      <p>Robustness requires that additions preserve a malicious decision. MALSETS guarantees the stronger property that additions cannot decrease the malware score by replacing ρ with a non-decreasing, monotone, head <i>g</i> such that <i>f</i>(<i>S</i>) = <i>g</i>(<i>r</i>(<i>S</i>)). Since Eq. 3 holds coordinate-wise in <i>r</i>:</p>
+    </div>
+    <div class="op-eq" role="group" aria-label="Equation 5" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>f</i>(<i>S</i> ∪ <i>o</i>) ≥ <i>f</i>(<i>S</i>) for every finite <i>o</i> ⊂ Σ<sup>∗</sup>.</span><em>(5)</em></div>
+    </div>
+    <div class="prose">
+      <p>Therefore, under monotonicity, additive benign attacks can never lower a classifier’s score. This requires that the classifier’s input never decreases under additions.</p>
+      <p>MAX pooling provides this for any φ (Eq. 3), whereas SUM pooling only suffices if <i>H</i> is non-negative; for example, when φ is ReLU activated. Since DEEPDREBIN implicitly SUM pools and the columns of <i>W</i><sub>1</sub> can have negative entries, it does not suffice. Our proposed DEEPDREBIN+ therefore constrains every layer, including <i>W</i><sub>1</sub>, to be strictly positive.</p>
+      <p>Since any choice of a monotone head suffices, we choose a trivial linear layer with non-negative weights for MALSETS and</p>
+    </div>
+    <div class="op-eq" role="group" aria-label="Monotone head" data-augmented-ui="tl-clip br-clip border">
+      <div><span><i>g</i><sub>lin</sub>(<i>r</i>) = <i>w</i><sup>⊤</sup><i>r</i> + <i>b</i>, while <i>w</i> = softplus(θ) ≥ 0</span></div>
+    </div>
+    <div class="prose">
+      <p>and θ ∈ ℝ<sup><i>d</i><sub>φ</sub></sup> are unconstrained trainable vectors.</p>
+    </div>
+    <div class="callout" data-augmented-ui="tl-clip br-clip"><span class="eyebrow">Cost of Security</span><p>However, monotonicity comes at the cost of all benign evidence being ignored, whether added by an attacker or not. Therefore, if malware were only differentiable from benign samples by its absence of benign evidence, then per Eq. 3, the monotone head would score benign samples equally to those of malware. Thus, this would make the resulting detector unable to flag malware without also misclassifying benign samples.</p></div>
+  </section>
+
+  <section class="psec" id="settings">
+    <h2>Experimental Settings</h2>
+    <div class="prose">
+      <p>We evaluate on Hypercube as it is, to the best of our knowledge, the least biased public dataset for Android malware detection. It is compiled from a single market (Google Play) and time-stamped at upload time. Applications with at least two VirusTotal detections (VTT2) are labeled as malware, at a benign-to-malware ratio of 9:1. For a longer temporal evaluation window, we use the extended release of Hypercube spanning 2021–2024 with 224,965 applications. Regarding cardinality, all apps contain between 0 and 36,265 strings (median 199; 24 to 636 between the 1st and 99th percentiles).</p>
+    </div>
+    <figure class="figure" data-augmented-ui="tl-clip br-clip border">
+      <div class="scroll-x">
+      <svg class="dg" viewBox="0 0 640 146" role="img" aria-label="Hypercube timeline: training on 2021 with 67,953 apps; validation from January to June 2022 with 33,394 apps; test from July 2022 to December 2024, 30 months with 123,618 apps. Active learning runs for 36 months from January 2022, labelling 400 apps per month.">
+        <path class="ln-red" d="M170.0 36V28H620.0V36"/>
+        <text class="t-sm t-red mid" x="395.0" y="20">36 months of active learning, 400 labels per month</text>
+        <path class="box" d="M30.0 44H168.0V104L160.0 112H22.0V52Z"/>
+        <text class="t-b mid" x="95.0" y="70">Training</text>
+        <text class="t-sm t-muted mid" x="95.0" y="86">2021</text>
+        <text class="t-sm mid" x="95.0" y="102">67,953 apps</text>
+        <path class="box-dash" d="M180.0 44H243.0V104L235.0 112H172.0V52Z"/>
+        <text class="t-b mid" x="207.5" y="70">Validation</text>
+        <text class="t-sm t-muted mid" x="207.5" y="86">Jan–Jun 2022</text>
+        <text class="t-sm mid" x="207.5" y="102">33,394 apps</text>
+        <path class="box-red" d="M255.0 44H618.0V104L610.0 112H247.0V52Z"/>
+        <text class="t-b mid" x="432.5" y="70">Test (T=30)</text>
+        <text class="t-sm t-muted mid" x="432.5" y="86">Jul 2022–Dec 2024</text>
+        <text class="t-sm mid" x="432.5" y="102">123,618 apps</text>
+        <path class="ln" d="M20.0 116V124"/><text class="t-sm t-muted mid" x="20.0" y="138">2021</text>
+        <path class="ln" d="M170.0 116V124"/><text class="t-sm t-muted mid" x="170.0" y="138">2022</text>
+        <path class="ln" d="M320.0 116V124"/><text class="t-sm t-muted mid" x="320.0" y="138">2023</text>
+        <path class="ln" d="M470.0 116V124"/><text class="t-sm t-muted mid" x="470.0" y="138">2024</text>
+        <path class="ln" d="M620.0 116V124"/><text class="t-sm t-muted mid" x="620.0" y="138">2025</text>
+      </svg>
+      </div>
+      <figcaption>Hypercube (VTT2) timeline. Every detector is trained on 2021 and then updated monthly by active learning from January 2022 to December 2024. The first six months (January to June 2022) are the validation period with all results being reported on the remaining 30 test months (July 2022 to December 2024), following Chen et al. Malware: 10.7%, 10.8% and 9.5% over the three periods.</figcaption>
+    </figure>
+    <div class="prose">
+      <p>Every month, each detector scores the new applications, and the 400 with the lowest Maximum Softmax Probability (MSP) are labeled, simulating a human analyst. For headline performance, we report F1, FPR, and FNR. Additionally, we report reliability via E-AURC, Cap400 and F1<sup>∗</sup>, and stability via Sen[F1]. For robustness, we report the attack success rate (ASR) as the share of detected malware that an attacker turns benign. We limit the attack-budget to at most β=100 organs per application. We average all metrics over five seeds.</p>
+    </div>
+
+    <h3>Malware Detectors</h3>
+    <div class="prose">
+      <p>All DEEPSETS-based models share a common base design, where: (i) <i>e</i> is OpenAI’s text-embedding-3-large with all 3,072 dimensions, with empty feature groups skipped. (ii) The element network φ is a two-layer MLP with ReLU and dropout 0.3. (iii) The classifier head is a linear layer for ρ and a linear layer with softplus for the monotone head <i>g</i><sub>lin</sub>.</p>
+      <p>We compare our proposed detectors against twelve state-of-the-art malware detectors: DREBIN, SEC-SVM, RANDOMFOREST, DEEPDREBIN, RAMDA, HCC, DRMD, TIF, MALCERTAIN, LSE-FOREST, LIGHTGBM, and MONOGBT. With all baselines using the same top-10,000 Drebin features, <i>V</i>.</p>
+    </div>
+
+    <h3>Attackers</h3>
+    <div class="prose">
+      <p>Following our threat model, we consider additive attacks that graft organs, benign code fragments, onto malware applications. The attacks in this paper are conducted using an organ ice-box, <i>O</i>, harvested by prior problem-space work comprising 33,280 organs alongside their pre-computed feature-space effects. We call the number of grafted organs the dose β and report the attack success rate (ASR) at β=100, using the pre-computed feature-space effects, to provide a high-dose stress test.</p>
+    </div>
+    <div class="table-wrap"><table class="data-table attackers">
+      <caption>The Five Attackers. <i>V</i>: the top-10,000 features of the baselines. Σ<sup>∗</sup>: all strings. Deduplication leaves 7,694 effective organs for Σ<sup>∗</sup> and 3,143 for <i>V</i>.</caption>
+      <thead><tr><th>Attacker</th><th>Organs selected by</th><th class="n">Pool, <i>V</i></th><th class="n">Pool, Σ<sup>∗</sup></th></tr></thead>
+      <tbody>
+        <tr><td>B-RND</td><td>uniform draw across all organs</td><td class="n">33,280</td><td class="n">33,280</td></tr>
+        <tr><td>I-RND</td><td>uniform draw across the effective pool</td><td class="n">3,143</td><td class="n">7,694</td></tr>
+        <tr><td>EVD</td><td>random draw, kept only if the score drops</td><td class="n">3,143</td><td class="n">7,694</td></tr>
+        <tr><td>ADZ</td><td>query-guided search, plus own permission and intent edits</td><td class="n">3,143</td><td class="n">7,694</td></tr>
+        <tr><td>APG</td><td>best-ranked organ, exact form for MAX pooled DEEPSETS models</td><td class="n">3,143</td><td class="n">7,694</td></tr>
+      </tbody>
+    </table></div>
+    <div class="prose">
+      <p>Adversarial Program Generation (APG) is a white-box attack proposed by Pierazzi et al. that, at each step, selects the organ that lowers a detector’s score the most. For MALSETS, parameterizing ρ with a linear layer eliminates the need for re-scoring candidates by ρ, since the score changes by Δ(<i>o</i> | <i>S</i>) = ∑<sub><i>j</i></sub> <i>w<sub>j</sub></i> max(0, <i>r<sub>j</sub></i>(<i>o</i>) − <i>r<sub>j</sub></i>(<i>S</i>)). Hence, ranking organs in weight space reduces the cost by three orders of magnitude for MALSETS compared to the greedy procedure for MLPs, while remaining exact.</p>
+    </div>
+
+    <h3>Three Settings</h3>
+    <div class="cards" data-augmented-ui="tl-clip br-clip border">
+      <div class="card"><h4>Setting 1: Clean AL</h4><p>We report clean performance over the 30 test months (Jul 2022 to Dec 2024). Why? A robust detector is only useful if it continues to detect malware without an attacker. This experiment measures each detector’s clean performance under drift and serves as a baseline to measure the cost of security under attack.</p></div>
+      <div class="card"><h4>Setting 2: Attacking over Time</h4><p>We perform each of the five attacks monthly. Attackers only target malware, which was detected in that month, and the attacked samples never enter re-training. Here, we report the area-under-time of the ASR (AUT-ASR) from Jul 2022 to Dec 2024. Why? Active learning retrains the detector every month; hence, its robustness may change with every update. This experiment isolates the robustness of each deployed model from the training loop.</p></div>
+      <div class="card"><h4>Setting 3: Attacked AL</h4><p>From Jan 2022 onward, the attacker modifies every malware sample with APG. The adversarial samples then replace their original sample in active learning. In Setting 3 | A, the attacker stops once the sample is classified as benign. In Setting 3 | B, the attacker continues until the sample is both classified as benign and beyond the threshold for AL sampling based on a rolling average of the prior six months. Why? In deployment, attacked samples are selected for labeling and influence AL model updates. This experiment tests whether robustness holds when adversarial samples enter AL.</p></div>
+    </div>
+  </section>
+
+  <section class="psec" id="results">
+    <h2>Results</h2>
+    <div class="stats quad">
+      <div class="stat"><b class="red">0.0%</b><span>AUT-ASR against MALSETS under all five attackers</span></div>
+      <div class="stat"><b>38.4</b><span>F1 of MALSETS under clean AL, unchanged under attacked AL</span></div>
+      <div class="stat"><b>14.5</b><span>F1 points above the best monotone baseline</span></div>
+      <div class="stat"><b>20.2%</b><span>of F1 paid for security, against 22.8% to 64.9% for the other monotone detectors</span></div>
+    </div>
+
+    <h3>Ablations</h3>
+    <div class="prose">
+      <p>For ①, we show that DEEPDREBIN is an implicitly SUM-pooled DEEPSETS model in two ways. First, we convert trained DEEPDREBIN models into a DEEPSETS model by moving the activation and the bias into the classifier, ρ. Without retraining (row 1a of Table 2), it reproduces DEEPDREBIN’s results exactly. Second, we train a DEEPSETS model matching the network architecture and hyperparameters of DEEPDREBIN (row 1b): F1 37.3 ± 0.5 against 37.5 ± 1.0, E-AURC 4.33 against 4.36, which is within normal seed variance (paired per-seed differences, <i>p</i> ≥ 0.30). Lastly, in row 2, we move the activation function and bias from ρ into φ, which yields an improvement in F1 to 40.9 ± 1.4.</p>
+      <p>We then replace SUM- with MAX-pooling (row 3). MAX-pooling lowers evasion (AUT-ASR) under three of the five attacks: Blind Random (66.1 → 48.5%), Informed Random (97.1 → 77.4%), and EvD (95.9 → 95.5%). However, APG still evades at 99.5% and ADZ increases from 61.1 to 76.2%. Under clean AL, F1 rises by 4.8 (40.9 → 45.7) and E-AURC falls from 5.49 to 4.62.</p>
+      <p>Next, we replace the one-hot encoding with a general text encoder <i>e</i> on the same 10,000 strings of <i>V</i> (row 4). At a fixed vocabulary, the encoder does not raise clean AL F1 (45.7% → 42.9%, E-AURC 4.62 → 4.73), but it lowers evasion under all five attackers (APG 99.5 → 97.1%, ADZ 76.2 → 32.4%). We then open the vocabulary to Σ<sup>∗</sup>, eliminating the OOV problem (row 5). Using Σ<sup>∗</sup> improves clean AL performance by 5.2 points (42.9% → 48.1%). An open vocabulary also widens the attack surface, as the effective organ pool increases from 3,143 to 7,694. However, four out of the five attackers evade row 5 less than row 4, and only Blind Random gains (45.4 → 46.9%).</p>
+      <p>Lastly, we replace the classifier ρ with a monotone head <i>g</i><sub>lin</sub> (see rows 8–11), providing complete robustness to additive attacks; no adversarial true positives were evaded. On DEEPDREBIN, a non-negative output layer alone (DEEPDREBIN<sup>∗</sup>, row 7) is not sufficient. Since added features can lower the channels prior to the output layer, APG still achieves an average AUT-ASR of 100.0%, while costing F1 20.0 points (37.5 → 17.5). With all weights being non-negative (DEEPDREBIN+, row 8), no attack evades, but the cost of security is higher at F1 24.4 points (37.5 → 13.1). In contrast, robustness is achieved for DEEPSETS using MAX-pooling and a monotone head, ρ = <i>g</i><sub>lin</sub> (row 9), while only lowering F1 by 0.6 points on average (37.5 → 36.9, relative to DEEPDREBIN). Although <i>e</i> on <i>V</i> (row 10) further increases the cost of security to 2.5 points on average (37.5 → 35.0), when combined with an open vocabulary Σ<sup>∗</sup> (MALSETS, row 11), it increases F1 to 38.4 while improving the reliability under a monotone head (10.38 → 6.67 E-AURC).</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption class="chart-head">
+        <p class="chart-title">From DEEPDREBIN (row 1) to MALSETS (row 11)</p>
+        <p class="chart-sub">F1 (%) under clean AL (Setting 1), mean over five seeds. Higher is better.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-n"></i>evaded by APG (AUT-ASR 96.5% to 100%)</span><span><i class="sw-a"></i>never evaded by any attacker</span></div>
+      <div class="hb" role="list" style="--max:50; --label-w:15rem">
+        <div class="hb-group" aria-hidden="true">① Features as Sets</div>
+        <div class="hb-row" role="listitem" data-tip="Row 1: DEEPDREBIN|F1: 37.5 ± 1.0|E-AURC: 4.4 ± 0.0|APG AUT-ASR: 100.0%" aria-label="Row 1, DEEPDREBIN: F1 37.5, evaded by APG at 100.0%"><span class="hb-label">1 DEEPDREBIN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:37.5"></span></span><span class="hb-val">37.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 1a: DEEPSETS, φ = W1, SUM (converted)|F1: 37.5 ± 1.0|E-AURC: 4.4 ± 0.0|APG AUT-ASR: as row 1" aria-label="Row 1a, DEEPSETS with SUM pooling converted from DEEPDREBIN: F1 37.5, same evasion as row 1"><span class="hb-label">1a DEEPSETS[SUM], φ = W<sub>1</sub></span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:37.5"></span></span><span class="hb-val">37.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 1b: DEEPSETS, φ = W1, SUM (trained)|F1: 37.3 ± 0.5|E-AURC: 4.3 ± 0.0|APG AUT-ASR: 100.0%" aria-label="Row 1b, DEEPSETS with SUM pooling trained from scratch: F1 37.3, evaded by APG at 100.0%"><span class="hb-label">1b DEEPSETS[SUM], φ = W<sub>1</sub></span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:37.3"></span></span><span class="hb-val">37.3</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 2: DEEPSETS, φ = MLP, SUM|F1: 40.9 ± 1.4|E-AURC: 5.5 ± 0.2|APG AUT-ASR: 99.9%" aria-label="Row 2, DEEPSETS with an MLP element network and SUM pooling: F1 40.9, evaded by APG at 99.9%"><span class="hb-label">2 DEEPSETS[SUM]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:40.9"></span></span><span class="hb-val">40.9</span></div>
+        <div class="hb-group" aria-hidden="true">② Max Pooling</div>
+        <div class="hb-row" role="listitem" data-tip="Row 3: DEEPSETS, φ = MLP, MAX|F1: 45.7 ± 0.7|E-AURC: 4.6 ± 0.1|APG AUT-ASR: 99.5%" aria-label="Row 3, DEEPSETS with MAX pooling: F1 45.7, evaded by APG at 99.5%"><span class="hb-label">3 DEEPSETS[MAX]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:45.7"></span></span><span class="hb-val">45.7</span></div>
+        <div class="hb-group" aria-hidden="true">③ Open-Vocabulary Encoder</div>
+        <div class="hb-row" role="listitem" data-tip="Row 4: DEEPSETS[MAX, e, V, ρ]|F1: 42.9 ± 1.0|E-AURC: 4.7 ± 0.1|APG AUT-ASR: 97.1%" aria-label="Row 4, DEEPSETS with MAX pooling and the text encoder on V: F1 42.9, evaded by APG at 97.1%"><span class="hb-label">4 DEEPSETS[MAX, <i>e</i>, <i>V</i>, ρ]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:42.9"></span></span><span class="hb-val">42.9</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 5: DEEPSETS[MAX, e, Σ∗, ρ]|F1: 48.1 ± 0.8|E-AURC: 4.2 ± 0.2|APG AUT-ASR: 96.5%" aria-label="Row 5, DEEPSETS with MAX pooling and the text encoder on all strings: F1 48.1, evaded by APG at 96.5%"><span class="hb-label">5 DEEPSETS[MAX, <i>e</i>, Σ<sup>∗</sup>, ρ]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:48.1"></span></span><span class="hb-val hi">48.1</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 6: DEEPSETS[SUM, e, Σ∗, ρ]|F1: 37.8 ± 1.3|E-AURC: 6.5 ± 0.2|APG AUT-ASR: 100.0%" aria-label="Row 6, DEEPSETS with SUM pooling and the text encoder on all strings: F1 37.8, evaded by APG at 100.0%"><span class="hb-label">6 DEEPSETS[SUM, <i>e</i>, Σ<sup>∗</sup>, ρ]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:37.8"></span></span><span class="hb-val">37.8</span></div>
+        <div class="hb-group" aria-hidden="true">④ Monotone Head</div>
+        <div class="hb-row" role="listitem" data-tip="Row 7: DEEPDREBIN∗, ρ ≥ 0|F1: 17.5 ± 1.1|E-AURC: 4.5 ± 0.1|APG AUT-ASR: 100.0%" aria-label="Row 7, DEEPDREBIN with a non-negative output layer: F1 17.5, evaded by APG at 100.0%"><span class="hb-label">7 DEEPDREBIN<sup>∗</sup></span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:17.5"></span></span><span class="hb-val">17.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 8: DEEPDREBIN+, glin|F1: 13.1 ± 0.6|E-AURC: 8.0 ± 0.1|AUT-ASR: 0.0% under all five attackers" aria-label="Row 8, DEEPDREBIN+: F1 13.1, never evaded"><span class="hb-label">8 DEEPDREBIN+</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:13.1"></span></span><span class="hb-val">13.1</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 9: DEEPSETS, MAX, glin|F1: 36.9 ± 1.2|E-AURC: 9.8 ± 1.4|AUT-ASR: 0.0% under all five attackers" aria-label="Row 9, DEEPSETS with MAX pooling and a monotone head: F1 36.9, never evaded"><span class="hb-label">9 DEEPSETS[MAX, <i>g</i><sub>lin</sub>]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:36.9"></span></span><span class="hb-val">36.9</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 10: DEEPSETS[MAX, e, V, glin]|F1: 35.0 ± 0.8|E-AURC: 10.4 ± 0.8|AUT-ASR: 0.0% under all five attackers" aria-label="Row 10, DEEPSETS with MAX pooling, the text encoder on V and a monotone head: F1 35.0, never evaded"><span class="hb-label">10 DEEPSETS[MAX, <i>e</i>, <i>V</i>, <i>g</i><sub>lin</sub>]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:35.0"></span></span><span class="hb-val">35.0</span></div>
+        <div class="hb-row" role="listitem" data-tip="Row 11: MALSETS|F1: 38.4 ± 1.1|E-AURC: 6.7 ± 0.1|AUT-ASR: 0.0% under all five attackers" aria-label="Row 11, MALSETS: F1 38.4, never evaded"><span class="hb-label"><b>11 MALSETS</b></span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:38.4"></span></span><span class="hb-val hi">38.4</span></div>
+        <div class="hb-group" aria-hidden="true">Control: SUM in place of MAX</div>
+        <div class="hb-row" role="listitem" data-tip="Row 12: DEEPSETS[SUM, e, Σ∗, glin]|F1: 36.3 ± 0.9|E-AURC: 8.6 ± 0.9|AUT-ASR: 0.0% under all five attackers" aria-label="Row 12, DEEPSETS with SUM pooling, the text encoder on all strings and a monotone head: F1 36.3, never evaded"><span class="hb-label">12 DEEPSETS[SUM, <i>e</i>, Σ<sup>∗</sup>, <i>g</i><sub>lin</sub>]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:36.3"></span></span><span class="hb-val">36.3</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:20%">10</span><span style="left:40%">20</span><span style="left:60%">30</span><span style="left:80%">40</span><span style="left:100%">50</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot">
+        <span>Table 2, Setting 1 and Setting 2.</span>
+        <details class="chart-table"><summary>Show every row as a table</summary>
+          <div class="table-wrap"><table class="data-table">
+            <thead><tr><th>#</th><th class="n">F1</th><th class="n">E-AURC</th><th class="n">Sen[F1]</th><th class="n">B-Rnd</th><th class="n">I-Rnd</th><th class="n">EvD</th><th class="n">ADZ</th><th class="n">APG</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td class="n">37.5±1.0</td><td class="n">4.4±0.0</td><td class="n">−1.19±0.12</td><td class="n">49.5±2.6</td><td class="n">76.8±1.0</td><td class="n">99.4±0.1</td><td class="n">30.2±3.4</td><td class="n">100.0±0.0</td></tr>
+              <tr><td>1a</td><td class="n">37.5±1.0</td><td class="n">4.4±0.0</td><td class="n">−1.19±0.12</td><td class="n">=</td><td class="n">=</td><td class="n">=</td><td class="n">=</td><td class="n">=</td></tr>
+              <tr><td>1b</td><td class="n">37.3±0.5</td><td class="n">4.3±0.0</td><td class="n">−1.22±0.18</td><td class="n">49.3±0.8</td><td class="n">76.9±0.7</td><td class="n">99.4±0.2</td><td class="n">29.1±1.3</td><td class="n">100.0±0.0</td></tr>
+              <tr><td>2</td><td class="n">40.9±1.4</td><td class="n">5.5±0.2</td><td class="n">−0.96±0.09</td><td class="n">66.1±5.8</td><td class="n">97.1±1.2</td><td class="n">95.9±1.3</td><td class="n">61.1±6.8</td><td class="n">99.9±0.1</td></tr>
+              <tr><td>3</td><td class="n">45.7±0.7</td><td class="n">4.6±0.1</td><td class="n">−0.94±0.05</td><td class="n">48.5±5.4</td><td class="n">77.4±9.4</td><td class="n">95.5±2.6</td><td class="n">76.2±18.0</td><td class="n">99.5±0.4</td></tr>
+              <tr><td>4</td><td class="n">42.9±1.0</td><td class="n">4.7±0.1</td><td class="n">−0.85±0.11</td><td class="n">45.4±8.9</td><td class="n">63.7±8.7</td><td class="n">86.4±3.8</td><td class="n">32.4±9.2</td><td class="n">97.1±2.3</td></tr>
+              <tr><td>5</td><td class="n">48.1±0.8</td><td class="n">4.2±0.2</td><td class="n">−0.82±0.05</td><td class="n">46.9±3.2</td><td class="n">54.1±4.5</td><td class="n">71.0±1.9</td><td class="n">31.7±8.3</td><td class="n">96.5±2.1</td></tr>
+              <tr><td>6</td><td class="n">37.8±1.3</td><td class="n">6.5±0.2</td><td class="n">−1.05±0.16</td><td class="n">91.9±3.4</td><td class="n">98.3±1.7</td><td class="n">98.1±0.8</td><td class="n">75.1±7.2</td><td class="n">100.0±0.1</td></tr>
+              <tr><td>7</td><td class="n">17.5±1.1</td><td class="n">4.5±0.1</td><td class="n">−1.22±0.18</td><td class="n">51.3</td><td class="n">70.2</td><td class="n">98.9</td><td class="n">37.9</td><td class="n">100.0</td></tr>
+              <tr><td>8</td><td class="n">13.1±0.6</td><td class="n">8.0±0.1</td><td class="n">−0.69±0.05</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td></tr>
+              <tr><td>9</td><td class="n">36.9±1.2</td><td class="n">9.8±1.4</td><td class="n">−0.66±0.13</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td></tr>
+              <tr><td>10</td><td class="n">35.0±0.8</td><td class="n">10.4±0.8</td><td class="n">−0.76±0.10</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td></tr>
+              <tr class="hl"><td>11</td><td class="n">38.4±1.1</td><td class="n">6.7±0.1</td><td class="n">−0.80±0.16</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td></tr>
+              <tr><td>12</td><td class="n">36.3±0.9</td><td class="n">8.6±0.9</td><td class="n">−0.76±0.07</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td><td class="n">0.0±0.0</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <h3>Comparison with State-of-the-Art</h3>
+    <div class="prose">
+      <p>We compare our models with twelve baselines from three architecture families: linear models, tree ensembles, and MLPs. Our DEEPSETS models form a fourth family, MIL.</p>
+      <p>Under clean active learning, MLPs are the strongest baselines, with DRMD (43.6) and TIF (39.6) having the highest performance. Following the top performing MLPs, are RANDOMFOREST (38.3), HCC (38.1), and LIGHTGBM (38.1). With the remaining baselines from those families, alongside linear models, trailing behind (13.1–37.5). Our non-monotone MIL model, DEEPSETS[MAX, <i>e</i>, Σ<sup>∗</sup>], reaches the highest F1 of all detectors (48.1), surpassing DRMD while having the best reliability (E-AURC, 4.22).</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption class="chart-head">
+        <p class="chart-title">Clean against attacked active learning</p>
+        <p class="chart-sub">F1 (%) over the 30 test months under Setting 1 and Setting 3 | B. Each label gives the percentage of malware evaded.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-a"></i>never evaded</span><span><i class="sw-n"></i>evaded</span></div>
+      <div class="scroll-x">
+      <svg class="lc scatter" viewBox="0 0 640 384" role="img" aria-label="Scatter plot of F1 under clean active learning against F1 under attacked active learning for 16 detectors. MALSETS sits at 38.4 and 38.4 and is never evaded; DRMD (43.6, 34.1, 21% evaded) and DEEPSETS (48.1, 30.3, 25% evaded) complete the Pareto front. The other monotone detectors, DREBIN+, MONOGBT and DEEPDREBIN+, are never evaded but score 13.1 to 23.9. Most other baselines fall below 8 F1 under attack, with 73% to 100% of malware evaded.">
+        <line class="axis" x1="64" x2="604" y1="334.0" y2="334.0"/><text x="56" y="338.0" text-anchor="end">0</text>
+        <line class="grid" x1="64" x2="604" y1="259.0" y2="259.0"/><text x="56" y="263.0" text-anchor="end">10</text>
+        <line class="grid" x1="64" x2="604" y1="184.0" y2="184.0"/><text x="56" y="188.0" text-anchor="end">20</text>
+        <line class="grid" x1="64" x2="604" y1="109.0" y2="109.0"/><text x="56" y="113.0" text-anchor="end">30</text>
+        <line class="grid" x1="64" x2="604" y1="34.0" y2="34.0"/><text x="56" y="38.0" text-anchor="end">40</text>
+        <line class="axis" x1="64.0" x2="64.0" y1="334" y2="339"/><text x="64.0" y="353" text-anchor="middle">10</text>
+        <line class="axis" x1="199.0" x2="199.0" y1="334" y2="339"/><text x="199.0" y="353" text-anchor="middle">20</text>
+        <line class="axis" x1="334.0" x2="334.0" y1="334" y2="339"/><text x="334.0" y="353" text-anchor="middle">30</text>
+        <line class="axis" x1="469.0" x2="469.0" y1="334" y2="339"/><text x="469.0" y="353" text-anchor="middle">40</text>
+        <line class="axis" x1="604.0" x2="604.0" y1="334" y2="339"/><text x="604.0" y="353" text-anchor="middle">50</text>
+        <text x="334" y="372" text-anchor="middle">F1, clean AL</text>
+        <text x="16" y="184" text-anchor="middle" transform="rotate(-90 16 184)">F1, attacked AL</text>
+        <polyline class="front" points="447.4,46.0 517.6,78.2 578.4,106.8"/>
+        <text class="lbl front-lbl" x="531.6" y="66.2">Pareto front</text>
+        <rect class="mk-key" x="71.5" y="11.5" width="9" height="9"/>
+        <text class="lbl" x="87" y="20">Linear</text>
+        <path class="mk-key" d="M150.0 10.0L155.5 20.0H144.5Z"/>
+        <text class="lbl" x="161" y="20">Trees</text>
+        <circle class="mk-key" cx="224.0" cy="16.0" r="5"/>
+        <text class="lbl" x="235" y="20">MLPs</text>
+        <path class="mk-key" d="M298.0 9.5L304.5 16.0L298.0 22.5L291.5 16.0Z"/>
+        <text class="lbl" x="309" y="20">MIL</text>
+        <rect class="dot-n" x="336.2" y="329.5" width="9" height="9" data-tip="DREBIN|Linear|F1, clean AL: 30.5|F1, attacked AL: 0.0|Malware evaded: 100.0%" aria-label="DREBIN, Linear: clean F1 30.5, attacked F1 0.0, 100.0% of malware evaded"/>
+        <rect class="dot-n" x="287.6" y="304.0" width="9" height="9" data-tip="SEC-SVM|Linear|F1, clean AL: 26.9|F1, attacked AL: 3.4|Malware evaded: 90.0%" aria-label="SEC-SVM, Linear: clean F1 26.9, attacked F1 3.4, 90.0% of malware evaded"/>
+        <rect class="dot-a" x="243.1" y="152.5" width="9" height="9" data-tip="DREBIN+|Linear|F1, clean AL: 23.6|F1, attacked AL: 23.6|Malware evaded: 0.0%" aria-label="DREBIN+, Linear: clean F1 23.6, attacked F1 23.6, 0.0% of malware evaded"/>
+        <path class="dot-n" d="M446.0 274.8L451.5 284.8H440.5Z" data-tip="RANDOMFOREST|Trees|F1, clean AL: 38.3|F1, attacked AL: 7.1|Malware evaded: 72.7%" aria-label="RANDOMFOREST, Trees: clean F1 38.3, attacked F1 7.1, 72.7% of malware evaded"/>
+        <path class="dot-n" d="M255.7 324.2L261.2 334.2H250.2Z" data-tip="LSE-FOREST|Trees|F1, clean AL: 24.2|F1, attacked AL: 0.5|Malware evaded: 97.6%" aria-label="LSE-FOREST, Trees: clean F1 24.2, attacked F1 0.5, 97.6% of malware evaded"/>
+        <path class="dot-n" d="M443.4 287.5L448.9 297.5H437.9Z" data-tip="LIGHTGBM|Trees|F1, clean AL: 38.1|F1, attacked AL: 5.4|Malware evaded: 82.9%" aria-label="LIGHTGBM, Trees: clean F1 38.1, attacked F1 5.4, 82.9% of malware evaded"/>
+        <path class="dot-a" d="M251.6 148.8L257.1 158.8H246.1Z" data-tip="MONOGBT|Trees|F1, clean AL: 23.9|F1, attacked AL: 23.9|Malware evaded: 0.0%" aria-label="MONOGBT, Trees: clean F1 23.9, attacked F1 23.9, 0.0% of malware evaded"/>
+        <circle class="dot-n" cx="332.6" cy="305.5" r="5" data-tip="MALCERTAIN|MLPs|F1, clean AL: 29.9|F1, attacked AL: 3.8|Malware evaded: 87.9%" aria-label="MALCERTAIN, MLPs: clean F1 29.9, attacked F1 3.8, 87.9% of malware evaded"/>
+        <circle class="dot-n" cx="419.0" cy="140.5" r="5" data-tip="RAMDA|MLPs|F1, clean AL: 36.3|F1, attacked AL: 25.8|Malware evaded: 34.4%" aria-label="RAMDA, MLPs: clean F1 36.3, attacked F1 25.8, 34.4% of malware evaded"/>
+        <circle class="dot-n" cx="443.4" cy="313.0" r="5" data-tip="HCC|MLPs|F1, clean AL: 38.1|F1, attacked AL: 2.8|Malware evaded: 90.9%" aria-label="HCC, MLPs: clean F1 38.1, attacked F1 2.8, 90.9% of malware evaded"/>
+        <circle class="dot-n" cx="463.6" cy="331.0" r="5" data-tip="TIF|MLPs|F1, clean AL: 39.6|F1, attacked AL: 0.4|Malware evaded: 99.4%" aria-label="TIF, MLPs: clean F1 39.6, attacked F1 0.4, 99.4% of malware evaded"/>
+        <circle class="dot-n" cx="517.6" cy="78.2" r="5" data-tip="DRMD|MLPs|F1, clean AL: 43.6|F1, attacked AL: 34.1|Malware evaded: 20.7%" aria-label="DRMD, MLPs: clean F1 43.6, attacked F1 34.1, 20.7% of malware evaded"/>
+        <circle class="dot-n" cx="435.2" cy="201.2" r="5" data-tip="DEEPDREBIN|MLPs|F1, clean AL: 37.5|F1, attacked AL: 17.7|Malware evaded: 49.5%" aria-label="DEEPDREBIN, MLPs: clean F1 37.5, attacked F1 17.7, 49.5% of malware evaded"/>
+        <circle class="dot-a" cx="105.8" cy="235.8" r="5" data-tip="DEEPDREBIN+|MLPs|F1, clean AL: 13.1|F1, attacked AL: 13.1|Malware evaded: 0.0%" aria-label="DEEPDREBIN+, MLPs: clean F1 13.1, attacked F1 13.1, 0.0% of malware evaded"/>
+        <path class="dot-n" d="M578.4 100.2L584.9 106.8L578.4 113.2L571.9 106.8Z" data-tip="DEEPSETS|MIL|F1, clean AL: 48.1|F1, attacked AL: 30.3|Malware evaded: 24.5%" aria-label="DEEPSETS, MIL: clean F1 48.1, attacked F1 30.3, 24.5% of malware evaded"/>
+        <path class="dot-a" d="M447.4 39.5L453.9 46.0L447.4 52.5L440.9 46.0Z" data-tip="MALSETS|MIL|F1, clean AL: 38.4|F1, attacked AL: 38.4|Malware evaded: 0.0%" aria-label="MALSETS, MIL: clean F1 38.4, attacked F1 38.4, 0.0% of malware evaded"/>
+        <text class="lbl" x="350.8" y="338.0" text-anchor="start" aria-hidden="true">DREBIN <tspan class="pct">100</tspan></text>
+        <text class="lbl" x="283.1" y="312.5" text-anchor="end" aria-hidden="true">SEC-SVM <tspan class="pct">90</tspan></text>
+        <text class="lbl hot" x="238.6" y="169.0" text-anchor="end" aria-hidden="true">DREBIN+ <tspan class="pct">0</tspan></text>
+        <text class="lbl" x="456.0" y="280.8" text-anchor="start" aria-hidden="true">RANDOMFOREST <tspan class="pct">73</tspan></text>
+        <text class="lbl" x="246.7" y="334.2" text-anchor="end" aria-hidden="true">LSE-FOREST <tspan class="pct">98</tspan></text>
+        <text class="lbl" x="453.4" y="297.5" text-anchor="start" aria-hidden="true">LIGHTGBM <tspan class="pct">83</tspan></text>
+        <text class="lbl hot" x="260.6" y="148.8" text-anchor="start" aria-hidden="true">MONOGBT <tspan class="pct">0</tspan></text>
+        <text class="lbl" x="332.6" y="294.5" text-anchor="middle" aria-hidden="true">MALCERTAIN <tspan class="pct">88</tspan></text>
+        <text class="lbl" x="428.0" y="144.5" text-anchor="start" aria-hidden="true">RAMDA <tspan class="pct">34</tspan></text>
+        <text class="lbl" x="453.4" y="318.0" text-anchor="start" aria-hidden="true">HCC <tspan class="pct">91</tspan></text>
+        <text class="lbl" x="473.6" y="337.0" text-anchor="start" aria-hidden="true">TIF <tspan class="pct">99</tspan></text>
+        <text class="lbl" x="527.6" y="82.2" text-anchor="start" aria-hidden="true">DRMD <tspan class="pct">21</tspan></text>
+        <text class="lbl" x="445.2" y="205.2" text-anchor="start" aria-hidden="true">DEEPDREBIN <tspan class="pct">50</tspan></text>
+        <text class="lbl hot" x="115.8" y="239.8" text-anchor="start" aria-hidden="true">DEEPDREBIN+ <tspan class="pct">0</tspan></text>
+        <text class="lbl" x="578.4" y="126.8" text-anchor="end" aria-hidden="true">DEEPSETS <tspan class="pct">25</tspan></text>
+        <text class="lbl hot" x="436.4" y="50.0" text-anchor="end" aria-hidden="true">MALSETS <tspan class="pct">0</tspan></text>
+      </svg>
+      </div>
+      <div class="chart-foot">
+        <span>Clean versus Attacked Active Learning. Each detector is evaluated over a 30 month test period, on the Hypercube dataset, under both the clean (x axis) and attacked (y axis) active learning settings. With MALSETS being the only detector on the Pareto front that is never evaded. The numbers assigned to each detector reflect the percentage of malware evaded, whereas the shape corresponds to the model paradigm.</span>
+        <details class="chart-table"><summary>Show every detector as a table</summary>
+          <div class="table-wrap"><table class="data-table sota">
+            <thead>
+              <tr><th rowspan="2">Detector</th><th class="n" colspan="2">Setting 1</th><th class="n">Setting 2</th><th class="n" colspan="3">Setting 3 | A</th><th class="n" colspan="3">Setting 3 | B</th></tr>
+              <tr><th class="n">F1</th><th class="n">E-AURC</th><th class="n">ASR</th><th class="n">F1</th><th class="n">E-AURC</th><th class="n">ASR</th><th class="n">F1</th><th class="n">E-AURC</th><th class="n">ASR</th></tr>
+            </thead>
+            <tbody>
+              <tr class="grp"><th colspan="10">Linear</th></tr>
+              <tr><td>DREBIN</td><td class="n">30.5</td><td class="n">5.2</td><td class="n">100.0</td><td class="n">0.0</td><td class="n">5.2</td><td class="n">100.0</td><td class="n">0.0</td><td class="n">6.8</td><td class="n">100.0</td></tr>
+              <tr><td>SEC-SVM</td><td class="n">26.9</td><td class="n">5.2</td><td class="n">100.0</td><td class="n">5.5</td><td class="n">5.3</td><td class="n">85.8</td><td class="n">3.4</td><td class="n">5.8</td><td class="n">90.0</td></tr>
+              <tr><td>DREBIN+</td><td class="n">23.6</td><td class="n">9.5</td><td class="n">0.0</td><td class="n">23.6</td><td class="n">9.5</td><td class="n">0.0</td><td class="n">23.6</td><td class="n">9.5</td><td class="n">0.0</td></tr>
+              <tr class="grp"><th colspan="10">Trees</th></tr>
+              <tr><td>RANDOMFOREST</td><td class="n">38.3</td><td class="n">4.9</td><td class="n">100.0</td><td class="n">7.5</td><td class="n">4.8</td><td class="n">79.6</td><td class="n">7.1</td><td class="n">5.0</td><td class="n">72.7</td></tr>
+              <tr><td>LSE-FOREST</td><td class="n">24.2</td><td class="n">6.4</td><td class="n">100.0</td><td class="n">0.2</td><td class="n">6.3</td><td class="n">99.3</td><td class="n">0.5</td><td class="n">6.8</td><td class="n">97.6</td></tr>
+              <tr><td>LIGHTGBM</td><td class="n">38.1</td><td class="n">4.3</td><td class="n">100.0</td><td class="n">9.1</td><td class="n">4.3</td><td class="n">80.7</td><td class="n">5.4</td><td class="n">4.5</td><td class="n">82.9</td></tr>
+              <tr><td>MONOGBT</td><td class="n">23.9</td><td class="n">6.1</td><td class="n">0.0</td><td class="n">23.9</td><td class="n">6.1</td><td class="n">0.0</td><td class="n">23.9</td><td class="n">6.1</td><td class="n">0.0</td></tr>
+              <tr class="grp"><th colspan="10">MLPs</th></tr>
+              <tr><td>MALCERTAIN</td><td class="n">29.9</td><td class="n">6.5</td><td class="n">95.7</td><td class="n">2.7</td><td class="n">8.2</td><td class="n">90.7</td><td class="n">3.8</td><td class="n">9.0</td><td class="n">87.9</td></tr>
+              <tr><td>RAMDA</td><td class="n">36.3</td><td class="n">8.4</td><td class="n">64.4</td><td class="n">25.2</td><td class="n">9.6</td><td class="n">36.2</td><td class="n">25.8</td><td class="n">9.2</td><td class="n">34.4</td></tr>
+              <tr><td>HCC</td><td class="n">38.1</td><td class="n">6.4</td><td class="n">100.0</td><td class="n">7.2</td><td class="n">7.4</td><td class="n">82.9</td><td class="n">2.8</td><td class="n">10.4</td><td class="n">90.9</td></tr>
+              <tr><td>TIF</td><td class="n">39.6</td><td class="n">6.4</td><td class="n">100.0</td><td class="n">1.9</td><td class="n">7.9</td><td class="n">96.7</td><td class="n">0.4</td><td class="n">9.7</td><td class="n">99.4</td></tr>
+              <tr><td>DRMD</td><td class="n">43.6</td><td class="n">9.4</td><td class="n">100.0</td><td class="n">32.3</td><td class="n">17.7</td><td class="n">26.0</td><td class="n">34.1</td><td class="n">10.0</td><td class="n">20.7</td></tr>
+              <tr><td>DEEPDREBIN</td><td class="n">37.5</td><td class="n">4.4</td><td class="n">100.0</td><td class="n">17.4</td><td class="n">4.4</td><td class="n">55.4</td><td class="n">17.7</td><td class="n">4.6</td><td class="n">49.5</td></tr>
+              <tr><td>DEEPDREBIN+</td><td class="n">13.1</td><td class="n">8.0</td><td class="n">0.0</td><td class="n">13.1</td><td class="n">8.0</td><td class="n">0.0</td><td class="n">13.1</td><td class="n">8.0</td><td class="n">0.0</td></tr>
+              <tr class="grp"><th colspan="10">MIL</th></tr>
+              <tr><td>DEEPSETS[MAX, <i>e</i>, <i>V</i>, ρ]</td><td class="n">42.9</td><td class="n">4.7</td><td class="n">97.1</td><td class="n">33.7</td><td class="n">5.1</td><td class="n">19.7</td><td class="n">31.7</td><td class="n">4.6</td><td class="n">15.4</td></tr>
+              <tr><td>DEEPSETS[MAX, <i>e</i>, <i>V</i>, <i>g</i><sub>lin</sub>]</td><td class="n">35.0</td><td class="n">10.4</td><td class="n">0.0</td><td class="n">35.0</td><td class="n">10.4</td><td class="n">0.0</td><td class="n">35.0</td><td class="n">10.4</td><td class="n">0.0</td></tr>
+              <tr><td>DEEPSETS[MAX, <i>e</i>, Σ<sup>∗</sup>, ρ]</td><td class="n">48.1</td><td class="n">4.2</td><td class="n">96.5</td><td class="n">36.7</td><td class="n">4.4</td><td class="n">24.5</td><td class="n">30.3</td><td class="n">4.3</td><td class="n">24.5</td></tr>
+              <tr class="hl"><td>MALSETS</td><td class="n">38.4</td><td class="n">6.7</td><td class="n">0.0</td><td class="n">38.4</td><td class="n">6.7</td><td class="n">0.0</td><td class="n">38.4</td><td class="n">6.7</td><td class="n">0.0</td></tr>
+            </tbody>
+          </table></div>
+        </details>
+      </div>
+    </figure>
+
+    <div class="prose">
+      <p>On all non-monotone baselines, APG achieves an AUT-ASR of at least 95.7%, with the exception of RAMDA at 64.4%. For our DEEPSETS-based approaches, APG also evades (96.5-97.1%) only against the non-monotone models.</p>
+      <p>While all monotone models are unevaded, AL on attacked malware recovers evasion for some detectors across both Setting 3 | A and Setting 3 | B. While DREBIN still remains fully evaded, SEC-SVM’s evasion decreases by an average of 12.1 points. For tree-based detectors, only RANDOMFOREST and LIGHTGBM meaningfully decrease evasion by 23.9 and 18.2 points on average. AL has the largest improvement on DRMD, DEEPSETS[MAX, <i>e</i>, <i>V</i>, ρ], and DEEPSETS[MAX, <i>e</i>, Σ<sup>∗</sup>, ρ] as they similarly recover 74.5 points on average under Setting 3 | A. Notably, our DEEPSETS[MAX, <i>e</i>, <i>V</i>, ρ] model is the least evaded under both Setting 3 | A and Setting 3 | B.</p>
+      <p>All monotone models remain unevaded, and MALSETS retains the highest performance under both settings. DEEPSETS[MAX, <i>e</i>, <i>V</i>, <i>g</i><sub>lin</sub>] trails by 3.4 F1 points, and the monotone baselines follow by a wide margin. Here, MONOGBT trails by 14.5, and DREBIN+ by 14.8 F1 points, respectively. DEEPDREBIN+ ranks last with 13.1 F1 points.</p>
+    </div>
+
+    <h3>Why MALSETS Pays Less</h3>
+    <div class="prose">
+      <p>With DEEPSETS models, we match the architecture to the set-shaped structure of the Drebin feature space, achieving the highest performance of any detector in our benchmark (row 5). While MALSETS loses 20.2% of its F1 (row 11 versus row 5 of Table 2), it pays the smallest cost of security compared to the other monotone detectors, which lose 22.8% for DREBIN+, 37.2% for MONOGBT, and 64.9% for DEEPDREBIN+. Therefore, MALSETS remains 14.5 points F1 above the best monotone baseline.</p>
+    </div>
+
+    <figure class="figure chart" data-augmented-ui="tl-clip br-clip border">
+      <figcaption class="chart-head">
+        <p class="chart-title">The cost of security under clean AL</p>
+        <p class="chart-sub">F1 (%) of each monotone detector against the non-monotone detector it constrains. Higher is better.</p>
+      </figcaption>
+      <div class="legend" aria-hidden="true"><span><i class="sw-n"></i>non-monotone</span><span><i class="sw-a"></i>monotone, never evaded</span></div>
+      <div class="hb" role="list" style="--max:50; --label-w:13rem">
+        <div class="hb-group" aria-hidden="true">Linear: loses 22.8%</div>
+        <div class="hb-row" role="listitem" data-tip="DREBIN|F1: 30.5" aria-label="DREBIN: F1 30.5"><span class="hb-label">DREBIN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:30.5"></span></span><span class="hb-val">30.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="DREBIN+|F1: 23.6|loses 22.8% of DREBIN’s F1" aria-label="DREBIN+: F1 23.6, losing 22.8% of DREBIN's F1"><span class="hb-label">DREBIN+</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:23.6"></span></span><span class="hb-val">23.6</span></div>
+        <div class="hb-group" aria-hidden="true">Trees: loses 37.2%</div>
+        <div class="hb-row" role="listitem" data-tip="LIGHTGBM|F1: 38.1" aria-label="LIGHTGBM: F1 38.1"><span class="hb-label">LIGHTGBM</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:38.1"></span></span><span class="hb-val">38.1</span></div>
+        <div class="hb-row" role="listitem" data-tip="MONOGBT|F1: 23.9|loses 37.2% of LIGHTGBM’s F1" aria-label="MONOGBT: F1 23.9, losing 37.2% of LIGHTGBM's F1"><span class="hb-label">MONOGBT</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:23.9"></span></span><span class="hb-val">23.9</span></div>
+        <div class="hb-group" aria-hidden="true">MLPs: loses 64.9%</div>
+        <div class="hb-row" role="listitem" data-tip="DEEPDREBIN|F1: 37.5" aria-label="DEEPDREBIN: F1 37.5"><span class="hb-label">DEEPDREBIN</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:37.5"></span></span><span class="hb-val">37.5</span></div>
+        <div class="hb-row" role="listitem" data-tip="DEEPDREBIN+|F1: 13.1|loses 64.9% of DEEPDREBIN’s F1" aria-label="DEEPDREBIN+: F1 13.1, losing 64.9% of DEEPDREBIN's F1"><span class="hb-label">DEEPDREBIN+</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:13.1"></span></span><span class="hb-val">13.1</span></div>
+        <div class="hb-group" aria-hidden="true">MIL on <i>V</i>: loses 18.4%</div>
+        <div class="hb-row" role="listitem" data-tip="DEEPSETS[MAX, e, V, ρ]|F1: 42.9" aria-label="DEEPSETS with MAX pooling and the text encoder on V: F1 42.9"><span class="hb-label">DEEPSETS[MAX, <i>e</i>, <i>V</i>, ρ]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:42.9"></span></span><span class="hb-val">42.9</span></div>
+        <div class="hb-row" role="listitem" data-tip="DEEPSETS[MAX, e, V, glin]|F1: 35.0|loses 18.4% of DEEPSETS[MAX, e, V, ρ]’s F1" aria-label="DEEPSETS with a monotone head on V: F1 35.0, losing 18.4%"><span class="hb-label">DEEPSETS[MAX, <i>e</i>, <i>V</i>, <i>g</i><sub>lin</sub>]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:35.0"></span></span><span class="hb-val">35.0</span></div>
+        <div class="hb-group" aria-hidden="true">MIL on Σ<sup>∗</sup>: loses 20.2%</div>
+        <div class="hb-row" role="listitem" data-tip="DEEPSETS[MAX, e, Σ∗, ρ]|F1: 48.1" aria-label="DEEPSETS with MAX pooling and the text encoder on all strings: F1 48.1"><span class="hb-label">DEEPSETS[MAX, <i>e</i>, Σ<sup>∗</sup>, ρ]</span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-n" style="--v:48.1"></span></span><span class="hb-val">48.1</span></div>
+        <div class="hb-row" role="listitem" data-tip="MALSETS|F1: 38.4|loses 20.2% of DEEPSETS[MAX, e, Σ∗, ρ]’s F1" aria-label="MALSETS: F1 38.4, losing 20.2%"><span class="hb-label"><b>MALSETS</b></span><span class="hb-track" aria-hidden="true"><span class="hb-seg hb-a" style="--v:38.4"></span></span><span class="hb-val hi">38.4</span></div>
+      </div>
+      <div class="hb-axis" aria-hidden="true">
+        <span class="sp"></span>
+        <div class="hb-ticks"><span style="left:0">0</span><span style="left:20%">10</span><span style="left:40%">20</span><span style="left:60%">30</span><span style="left:80%">40</span><span style="left:100%">50</span></div>
+        <span class="sp"></span>
+      </div>
+      <div class="chart-foot"><span>Table 3, Setting 1.</span></div>
+    </figure>
+
+    <div class="prose">
+      <p><strong>Monotonicity.</strong> Linear models and MLPs are only robust if all weights are constrained. For example, APG still fully evades DEEPDREBIN<sup>∗</sup> with a monotone output layer (row 7 in Table 2), and DEEPDREBIN+ costs a 64.9% reduction in F1 to completely eliminate APG evasions (row 8 in Table 2). In contrast, MALSETS only requires the classifier ρ to be monotone, since adding features can only raise channels by construction.</p>
+      <p><strong>Pooling Operator.</strong> Compared to MAX pooling, SUM pooling leads to feature accumulation, reducing F1 by 2.1 points while decreasing reliability by 1.92 (row 12, Table 2). A monotone head for MALSETS is not a performance bottleneck.</p>
+      <p><strong>Open Vocabulary.</strong> Feature selection is an explicit design choice for MALSETS. If all malware-features of a malignant sample were transplanted to a benign application, monotone detectors would score this sample at least as high. This holds for 32% of malware under <i>V</i>, for 14% under <i>V</i><sub>100k</sub>, and reduces to 3% under Σ<sup>∗</sup>.</p>
+    </div>
+    <blockquote class="excerpt"><p>In summary, DEEPSETS models match the architecture to the set-shaped problem, MALSETS constrains only the head, MAX pooling prevents features from accumulating, while feature selection becomes an optional design-choice.</p></blockquote>
+  </section>
+
+  <section class="psec" id="limitations">
+    <h2>Limitations</h2>
+    <div class="prose">
+      <p>In our design and evaluation of MALSETS, we made a concerted effort to ablate every step of the process; however, there remain the following natural limitations to this work.</p>
+      <ul>
+        <li>First, our experiments were conducted only on the Hypercube dataset; however, this choice was deliberate, as it constitutes the current standard for unbiased dataset construction with no comparable standards for other marketplaces.</li>
+        <li>Second, all our baselines share the same top-10,000 vocabulary, <i>V</i>, for consistency. Although this selection is in line with prior work, there have been other proposed approaches for the selection of Drebin features; however, as MALSETS uses Σ<sup>∗</sup>, it is independent of feature selection.</li>
+        <li>Third, we focus on additive benign attacks, as they are the predominant threat in the literature. Due to monotonicity, MALSETS is robust to the removal of benign features; whereas the removal of malware features in the problem-space, without breaking malicious functionality, remains an open problem.</li>
+        <li>Fourth, we focus on the threat model of an attacker aiming to evade a target system; however, monotonicity does not prevent data poisoning. Therefore, the addition of malicious features to benign samples could facilitate the poisoning of MALSETS, which we believe would be a natural direction for future work aiming to improve the resilience of MALSETS-based detectors.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="psec" id="contributions">
+    <h2>Contributions</h2>
+    <ul class="takeaways">
+      <li><span><strong>Problem Aligned Design through MIL.</strong> We cast static malware detection as MIL and operationalize it via DEEPSETS. A general text encoder embeds every feature string, which eliminates the out-of-vocabulary (OOV) problem by design. MAX pooling retains the malicious evidence of the sample, regardless of how many benign features an attacker adds.</span></li>
+      <li><span><strong>Functional Monotonicity.</strong> We devise MALSETS by equipping MAX-pooled DEEPSETS models with a monotone head, over an open vocabulary representation. Since MAX pooling never decreases under benign addition, neither does the malware score. MALSETS thereby addresses the cost of security paid by prior monotone detectors, as it jointly maximizes both clean and attacked AL performance.</span></li>
+      <li><span><strong>Adversarial Robustness.</strong> For MALSETS, more is never less as it is never evaded by any of the five attack families in our benchmark, ranging from black-box to white-box attacks. Under attack, MALSETS also retains the highest F1 of all detectors.</span></li>
+    </ul>
+    <blockquote class="excerpt"><p>Altogether, these produce MALSETS, which pays the smallest relative cost of security for remaining completely unevaded by state-of-the-art black-box and white-box additive attacks.</p></blockquote>
+  </section>
+</Paper>
+
+<style is:global>
+  .fig-tikz a { display: block; cursor: zoom-in; }
+  .fig-tikz img { display: block; width: 100%; height: auto; }
+  .fig-tikz .crt-on, :root[data-crt='on'] .fig-tikz .crt-off { display: none; }
+  :root[data-crt='on'] .fig-tikz .crt-on { display: block; }
+  @media (max-width: 640px) { .fig-tikz img { width: var(--phone-w, 900px); max-width: none; } }
+  .fig-panel { display: inline-block; min-width: 1.25em; padding: 0 .2em; border: 1px solid currentColor; font-size: .78em; font-weight: 700; line-height: 1.3; text-align: center; vertical-align: .08em; }
+  .fig-step { display: inline-flex; align-items: center; justify-content: center; width: 1.35em; height: 1.35em; border: 1px solid #c9972e; border-radius: 50%; color: #c9972e; font-size: .78em; font-weight: 700; vertical-align: .08em; }
+  .paper-body sub, .paper-body sup { font-size: .72em; line-height: 0; }
+  .paper-body .figure.chart { margin: 32px 0; }
+  .paper-body code { font-family: var(--f-term); font-size: .82em; color: var(--bone); overflow-wrap: anywhere; }
+  .op-eq { margin: 8px 0 24px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--smoke); overflow-x: auto; }
+  .op-eq > div { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; padding: 6px 0; font-family: var(--f-text); font-size: 16px; color: var(--bone); white-space: nowrap; }
+  .op-eq em { font-style: normal; font-family: var(--f-term); font-size: 12px; color: var(--ash); }
+  .op-eq sub, .op-eq sup { font-size: 0.72em; }
+  .dg .sub, .dg .sup { font-size: 8.5px; }
+  .lc .front { fill: none; stroke: var(--red); stroke-width: 1.2; stroke-dasharray: 5 4; opacity: .7; }
+  .lc .front-lbl { fill: var(--red); font-size: 11.5px; }
+  .lc .lbl.hot { fill: var(--red); }
+  .lc .lbl .pct { font-family: var(--f-term); font-size: 11px; fill: var(--ash); }
+  .lc .lbl.hot .pct { fill: var(--red); }
+  .lc .lbl.dim { fill: var(--ash); }
+  .lc .mk-key { fill: none; stroke: var(--ash); stroke-width: 1.3; }
+  .lc [data-tip] { cursor: default; }
+  .lc .dot-a:focus-visible, .lc .dot-n:focus-visible { outline: none; stroke: var(--bone); }
+  .data-table caption { caption-side: top; text-align: left; font-size: 13.5px; line-height: 1.45; color: var(--ash); padding-bottom: 10px; }
+  .data-table.attackers td:nth-child(2) { min-width: 14rem; }
+  .data-table.sota tr.grp th { text-align: left; font-weight: 650; color: var(--ash); padding-top: 14px; }
+  .data-table.sota td:first-child { white-space: nowrap; }
+  @media (min-width: 561px) {
+    .paper-body .stats.quad { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .paper-body .stats.quad > .stat:nth-child(2n) { border-right: 0; padding-left: 20px; }
+    .paper-body .stats.quad > .stat:nth-child(2n+1) { padding-left: 0; }
+    .paper-body .stats.quad > .stat:nth-child(-n+2) { border-bottom: 1px solid var(--smoke); }
+  }
+</style>

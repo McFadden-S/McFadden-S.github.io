@@ -1,4 +1,5 @@
 export const DESCRIPTIONS = {
+  "malsets": "Benign organs are grafted into a malware sample one by one, up to 100; under SUM pooling the malware channels fall, the benign ones rise and the sample is evaded, while under MALSETS the channels only rise and the malware score never falls",
   "replicant": "An agent edits a malware sample feature by feature and queries a label-only detector until the sample is labelled goodware, then the detector retrains on adversarial samples",
   "sok": "An agent walks the four stages of a DRL pipeline while the pitfall prevalence bars for each stage fill in",
   "direction": "Source code is scanned function by function through the ML4AVD pipeline; each function gets only a binary label while type, affected lines and trigger conditions stay unknown",
@@ -13,6 +14,44 @@ export const DESCRIPTIONS = {
 };
 
 export const SCENES = {
+  malsets(e, t) {
+    e.head('MalSets', 'arXiv 2026');
+    const C = 16, run = 11, tc = t % C, cyc = Math.floor(t / C);
+    const f = Math.min(1, tc / run), beta = Math.round(f * 100);
+    e.P(3, 4, 'malware sample S', 'a');
+    ['"SEND_SMS"', '"getDeviceId"', '"BOOT_COMPLETED"'].forEach((s, i) => e.P(3, 6 + i, s, 'r'));
+    e.P(3, 10, 'grafted benign organs', 'a');
+    const shown = 13, first = Math.max(1, beta - shown + 1);
+    for (let k = first; k <= beta; k++) {
+      const id = 100 + Math.floor(e.h(k * 5.3 + cyc * 11) * 33000);
+      e.P(3, 12 + (k - first), '+ organ ' + id, k === beta && f < 1 ? 'i' : 'b');
+    }
+    e.P(3, 27, 'dose ' + beta + ' of 100', 'b');
+    e.P(3, 28, 'S -> S u o', 'a');
+    const panel = (y, title, mono) => {
+      e.box(32, y, 56, 13, mono ? 'r' : 'a');
+      e.P(34, y + 1, title, mono ? 'r' : 'b');
+      for (let j = 0; j < 6; j++) {
+        const malPol = mono || j < 3;
+        const base = 0.3 + e.h(j * 7.7 + (mono ? 3 : 1)) * 0.4;
+        const v = mono ? Math.min(0.95, base + 0.06 * Math.floor(f * (2 + j % 3))) : malPol ? base * (1 - 0.8 * f) : Math.min(0.95, base + 0.6 * f);
+        e.P(34, y + 3 + j, 'r' + (j + 1), 'a');
+        e.bar(38, y + 3 + j, 22, v, malPol ? 'r' : 'b');
+      }
+      const score = mono ? Math.min(0.97, 0.78 + 0.18 * f) : Math.max(0.05, 0.86 - 1.3 * f);
+      e.P(64, y + 3, 'P(mal)', 'a');
+      e.bar(64, y + 4, 20, score, score >= 0.5 ? 'r' : 'i');
+      e.P(74, y + 5, '^', 'a');
+      e.P(70, y + 6, 'threshold', 'a');
+      const evaded = !mono && score < 0.5;
+      e.P(64, y + 8, evaded ? 'benign: evaded' : 'malware', evaded ? 'i' : 'r');
+    };
+    panel(4, 'SUM pooling, unconstrained head', false);
+    panel(18, 'MALSETS: MAX pooling, monotone head', true);
+    e.P(34, 32, '#  malware evidence', 'r');
+    e.P(55, 32, '#  benign evidence', 'b');
+  },
+
   replicant(e, t) {
     e.head('REPLICANT', 'arXiv 2026');
     const C = 17, tc = t % C, cyc = Math.floor(t / C);

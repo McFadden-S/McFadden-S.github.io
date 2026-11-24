@@ -40,7 +40,7 @@ interface Block {
 type Pt = [number, number, number];
 
 const POSITIONS: Record<string, [number, number]> = {
-  tesseract: [-20, 10], rpal: [-33, 1], alpoison: [-8, -1], drmd: [-6, 19], replicant: [-19, 30],
+  tesseract: [-20, 10], rpal: [-33, 1], alpoison: [-8, -1], drmd: [-6, 19], replicant: [-19, 30], malsets: [-35, 33],
   sok: [22, -8], acdenv: [35, -17], wendigo: [11, -21],
   onepic: [25, 18], 'onepic-short': [37, 27],
   direction: [-10, -28],
